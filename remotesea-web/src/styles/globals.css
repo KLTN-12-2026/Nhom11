@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-geist: "Inter", system-ui, sans-serif;
+    --font-serif: "Instrument Serif", Georgia, serif;
+    --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+    --bg: #f8f7f4;
+    --bg-card: #ffffff;
+    --bg-inset: #efede8;
+    --border: #efede8;
+    --border-strong: #ddd9d1;
+
+    --fg: #1a1917;
+    --fg-muted: #5c5954;
+    --fg-subtle: #9b9690;
+
+    --brand: #2e9b52;
+    --brand-hover: #1f7a3d;
+    --salary-bg: #fef3c7;
+    --salary-fg: #b45309;
+
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-neutral-100;
+    box-sizing: border-box;
+  }
+
+  body {
+    background-color: #f8f7f4;
+    color: #1a1917;
+    font-family: var(--font-geist);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: #2e9b52;
+    color: white;
+  }
+}
+
+@layer utilities {
+  .font-serif-italic {
+    font-family: var(--font-serif);
+    font-style: italic;
+  }
+}
