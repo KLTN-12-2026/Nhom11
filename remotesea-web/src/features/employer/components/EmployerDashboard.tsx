@@ -60,7 +60,7 @@ export const EmployerDashboard = () => {
               Employer dashboard
             </div>
             <h1 className="mb-1 text-[32px] font-semibold tracking-tight text-neutral-900">
-              {greeting}, <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>{firstName}.</em>
+              {greeting}, <em className="font-serif-italic text-brand-700">{firstName}.</em>
             </h1>
             <p className="text-[15px] text-neutral-500">
               You have <strong className="text-neutral-900">{stats.totalApps} applicants</strong> across{" "}

@@ -297,7 +297,7 @@ const ExplorerSection = () => {
             </p>
             <h2 className="text-[28px] font-semibold tracking-tight text-neutral-900">
               Salary by{" "}
-              <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+              <em className="font-serif-italic text-brand-700">
                 role &amp; seniority
               </em>
             </h2>
@@ -398,7 +398,7 @@ const CountrySection = () => {
           </p>
           <h2 className="text-[28px] font-semibold tracking-tight text-neutral-900">
             Where the{" "}
-            <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+            <em className="font-serif-italic text-brand-700">
               money
             </em>{" "}
             lives
@@ -443,7 +443,7 @@ const DistributionSection = () => {
             </p>
             <h2 className="mb-3 text-[28px] font-semibold tracking-tight text-white">
               The{" "}
-              <em className="font-serif italic text-brand-400" style={{ fontFamily: "var(--font-serif)" }}>
+              <em className="font-serif-italic text-brand-400">
                 shape
               </em>{" "}
               of remote pay.
@@ -502,7 +502,7 @@ const SubmitSection = () => {
             </p>
             <h2 className="mb-3 text-[28px] font-semibold tracking-tight text-neutral-900">
               Submit your salary,{" "}
-              <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+              <em className="font-serif-italic text-brand-700">
                 anonymously
               </em>
               .
@@ -588,7 +588,7 @@ export const SalaryPage = () => {
           </div>
           <h1 className="mb-4 max-w-2xl text-[clamp(32px,4.5vw,52px)] font-semibold leading-[1.1] tracking-tight text-neutral-900">
             What should you{" "}
-            <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+            <em className="font-serif-italic text-brand-700">
               actually
             </em>{" "}
             earn working remotely?

@@ -235,7 +235,7 @@ export const EmployerMarketingPage = () => {
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Why post here</p>
             <h2 className="text-[36px] font-semibold tracking-tight text-neutral-900">
               Smaller pool.{" "}
-              <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+              <em className="font-serif-italic text-brand-700">
                 Higher signal.
               </em>
             </h2>
@@ -264,7 +264,7 @@ export const EmployerMarketingPage = () => {
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Side by side</p>
           <h2 className="mb-8 text-[32px] font-semibold tracking-tight text-neutral-900">
             Versus the{" "}
-            <em className="font-serif italic" style={{ fontFamily: "var(--font-serif)" }}>
+            <em className="font-serif-italic">
               alternatives.
             </em>
           </h2>
@@ -303,7 +303,7 @@ export const EmployerMarketingPage = () => {
           <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">The process</p>
           <h2 className="mb-10 text-[32px] font-semibold tracking-tight text-neutral-900">
             List → review →{" "}
-            <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+            <em className="font-serif-italic text-brand-700">
               match.
             </em>
           </h2>

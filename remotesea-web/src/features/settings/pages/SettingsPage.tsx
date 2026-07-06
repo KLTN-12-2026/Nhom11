@@ -34,7 +34,7 @@ export const SettingsPage = () => {
         <div className="mb-8">
           <h1 className="mb-1 text-[32px] font-semibold tracking-tight text-neutral-900">
             Your account,{" "}
-            <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+            <em className="font-serif-italic text-brand-700">
               your rules.
             </em>
           </h1>

@@ -44,7 +44,7 @@ export const TalentDashboard = () => {
             Dashboard
           </div>
           <h1 className="mb-1 text-[32px] font-semibold tracking-tight text-neutral-900">
-            {greeting}, <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>{user?.name ?? "there"}</em>.
+            {greeting}, <em className="font-serif-italic text-brand-700">{user?.name ?? "there"}</em>.
           </h1>
           <p className="text-[14px] text-neutral-500">
             You have <strong className="font-semibold text-neutral-800">{interviewing} {interviewing === 1 ? "interview" : "interviews"} in progress</strong> and {offers} {offers === 1 ? "offer" : "offers"} on the table.
