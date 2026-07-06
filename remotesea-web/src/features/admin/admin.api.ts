@@ -1,6 +1,6 @@
 import { apiClient } from "@/services/api-client";
 import type { JobStatus } from "@/types/job";
-import type { AdminEmployersResponse, AdminJobsResponse } from "@/types/admin";
+import type { AdminEmployersResponse, AdminJobsResponse, RevenueResponse } from "@/types/admin";
 
 export const listAdminEmployers = async (
   params: { verified?: "true" | "false"; page?: number; limit?: number } = {}
@@ -33,5 +33,10 @@ export const reviewAdminJob = async (
     `/admin/jobs/${id}`,
     { action, note }
   );
+  return data;
+};
+
+export const getAdminRevenue = async (): Promise<RevenueResponse> => {
+  const { data } = await apiClient.get<RevenueResponse>("/admin/revenue");
   return data;
 };

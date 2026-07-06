@@ -100,12 +100,14 @@ const ListingsPanel = ({ jobs, applicationsByJob }: ListingsPanelProps) => {
               const reviewPct = total ? Math.round((reviewed / total) * 100) : 0;
               const shortPct = total ? Math.round((shortlisted / total) * 100) : 0;
 
-              return (
-                <Link
-                  className="grid cursor-pointer grid-cols-[1fr_80px_120px_60px_32px] items-center gap-3 rounded-12 px-2 py-3 transition-colors hover:bg-neutral-50"
-                  key={j.id}
-                  to={`/jobs/${j.id}`}
-                >
+              // The public job detail page only serves ACTIVE listings (drafts, pending
+              // review, closed, and rejected jobs 404 there by design) — so only link an
+              // employer's own row through when it's actually live; otherwise render the
+              // same row without navigation instead of sending them to a broken page.
+              const isPubliclyViewable = j.status === "ACTIVE";
+
+              const rowContent = (
+                <>
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5">
                       <span className="truncate text-[13.5px] font-medium text-neutral-900">
@@ -161,8 +163,34 @@ const ListingsPanel = ({ jobs, applicationsByJob }: ListingsPanelProps) => {
                     <div className="text-[10px] text-neutral-400">views</div>
                   </div>
 
-                  <ChevronRight className="text-neutral-300" size={14} />
-                </Link>
+                  {isPubliclyViewable ? (
+                    <ChevronRight className="text-neutral-300" size={14} />
+                  ) : (
+                    <span />
+                  )}
+                </>
+              );
+
+              if (isPubliclyViewable) {
+                return (
+                  <Link
+                    className="grid cursor-pointer grid-cols-[1fr_80px_120px_60px_32px] items-center gap-3 rounded-12 px-2 py-3 transition-colors hover:bg-neutral-50"
+                    key={j.id}
+                    to={`/jobs/${j.id}`}
+                  >
+                    {rowContent}
+                  </Link>
+                );
+              }
+
+              return (
+                <div
+                  className="grid grid-cols-[1fr_80px_120px_60px_32px] items-center gap-3 rounded-12 px-2 py-3"
+                  key={j.id}
+                  title="This listing isn't live yet, so it doesn't have a public page to view."
+                >
+                  {rowContent}
+                </div>
               );
             })}
           </div>

@@ -63,3 +63,35 @@ export type AdminEmployersResponse = {
   employers: AdminEmployer[];
   pagination: { page: number; limit: number; total: number; pages: number };
 };
+
+export type RevenueMonthBucket = {
+  key: string;
+  label: string;
+  standard: number;
+  featured: number;
+  handsOn: number;
+};
+
+export type RevenuePlanMix = {
+  planType: PlanType;
+  label: string;
+  price: number;
+  count: number;
+  amount: number;
+};
+
+export type RevenueTransaction = {
+  jobId: string;
+  jobTitle: string;
+  companyName: string;
+  planType: PlanType;
+  amount: number;
+  paidAt: string;
+};
+
+export type RevenueResponse = {
+  months: RevenueMonthBucket[];
+  mix: RevenuePlanMix[];
+  transactions: RevenueTransaction[];
+  totals: { allTime: number; thisMonth: number };
+};

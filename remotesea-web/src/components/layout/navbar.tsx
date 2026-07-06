@@ -89,6 +89,14 @@ export const Navbar = () => {
               >
                 Dashboard
               </Link>
+              {user.role === "ADMIN" && (
+                <Link
+                  className="rounded-8 px-3 py-1.5 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
+                  to={ROUTES.admin}
+                >
+                  Admin
+                </Link>
+              )}
               <button
                 className="rounded-8 px-3 py-1.5 text-sm text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-900"
                 type="button"

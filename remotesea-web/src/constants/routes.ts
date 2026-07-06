@@ -15,4 +15,5 @@ export const ROUTES = {
   profile: "/profile",
   postJob: "/post-job",
   postJobSuccess: "/post-job/success",
+  admin: "/admin",
 } as const;

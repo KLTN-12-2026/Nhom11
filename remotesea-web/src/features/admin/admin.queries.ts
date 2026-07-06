@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  getAdminRevenue,
   listAdminEmployers,
   listAdminJobs,
   reviewAdminJob,
@@ -10,6 +11,7 @@ import type { JobStatus } from "@/types/job";
 
 export const ADMIN_JOBS_KEY = ["admin", "jobs"];
 export const ADMIN_EMPLOYERS_KEY = ["admin", "employers"];
+export const ADMIN_REVENUE_KEY = ["admin", "revenue"];
 
 const ADMIN_LIST_LIMIT = 50;
 
@@ -50,5 +52,14 @@ export const useUpdateAdminEmployer = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ADMIN_EMPLOYERS_KEY });
     },
+  });
+};
+
+export const useAdminRevenue = () => {
+  const { user } = useAuth();
+  return useQuery({
+    queryKey: ADMIN_REVENUE_KEY,
+    queryFn: getAdminRevenue,
+    enabled: !!user && user.role === "ADMIN",
   });
 };

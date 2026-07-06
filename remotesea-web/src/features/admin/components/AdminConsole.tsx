@@ -1,12 +1,14 @@
 import { useState } from "react";
-import { Briefcase, Building } from "lucide-react";
+import { Briefcase, Building, Wallet } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { AdminQueue } from "@/features/admin/components/AdminQueue";
 import { AdminEmployers } from "@/features/admin/components/AdminEmployers";
+import { AdminRevenue } from "@/features/admin/components/AdminRevenue";
 
 const TABS = [
   { id: "queue", label: "Review queue", icon: Briefcase },
   { id: "employers", label: "Employers", icon: Building },
+  { id: "revenue", label: "Revenue", icon: Wallet },
 ] as const;
 
 export const AdminConsole = () => {
@@ -43,6 +45,7 @@ export const AdminConsole = () => {
         <div className="min-w-0 flex-1">
           {tab === "queue" && <AdminQueue />}
           {tab === "employers" && <AdminEmployers />}
+          {tab === "revenue" && <AdminRevenue />}
         </div>
       </div>
     </div>
