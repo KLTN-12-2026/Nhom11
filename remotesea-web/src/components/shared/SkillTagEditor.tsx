@@ -46,6 +46,7 @@ export const SkillTagEditor = ({ skills, setSkills }: SkillTagEditorProps) => {
           >
             {skill}
             <button
+              aria-label={`Remove skill: ${skill}`}
               className="text-neutral-400 hover:text-neutral-700"
               type="button"
               onClick={() => setSkills(skills.filter((existing) => existing !== skill))}

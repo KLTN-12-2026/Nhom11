@@ -5,6 +5,7 @@ import { FilterSidebar } from "@/features/jobs/components/FilterSidebar";
 import { JobCard } from "@/features/jobs/components/JobCard";
 import { JobCardSkeleton } from "@/features/jobs/components/JobCardSkeleton";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useJobsQuery } from "@/features/jobs/jobs.queries";
 import { useCategories } from "@/features/taxonomy/taxonomy.queries";
 import {
@@ -144,7 +145,11 @@ export const JobsBoard = ({ filters: query, onFiltersChange }: JobsBoardProps) =
                   key={`${p.label}-${i}`}
                 >
                   {p.label}
-                  <button className="text-neutral-400 hover:text-neutral-700" onClick={p.clear}>
+                  <button
+                    aria-label={`Remove filter: ${p.label}`}
+                    className="text-neutral-400 hover:text-neutral-700"
+                    onClick={p.clear}
+                  >
                     <X size={12} />
                   </button>
                 </span>
@@ -160,23 +165,25 @@ export const JobsBoard = ({ filters: query, onFiltersChange }: JobsBoardProps) =
               ))}
             </div>
           ) : isError ? (
-            <div className="py-16 text-center text-neutral-500">
-              <p className="mb-1 font-medium text-neutral-900">Couldn&apos;t load jobs</p>
-              <p className="mb-4 text-sm">Something went wrong fetching listings.</p>
-              <Button size="sm" variant="outline" onClick={() => refetch()}>
-                Try again
-              </Button>
-            </div>
+            <EmptyState
+              action={
+                <Button size="sm" variant="outline" onClick={() => refetch()}>
+                  Try again
+                </Button>
+              }
+              description="Something went wrong fetching listings."
+              title="Couldn't load jobs"
+            />
           ) : jobs.length === 0 ? (
-            <div className="py-16 text-center text-neutral-500">
-              <p className="mb-1 font-medium text-neutral-900">No jobs match these filters</p>
-              <p className="mb-4 text-sm">
-                Try removing a filter or set up an alert for when something fits.
-              </p>
-              <Button size="sm" variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
-                Clear filters
-              </Button>
-            </div>
+            <EmptyState
+              action={
+                <Button size="sm" variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
+                  Clear filters
+                </Button>
+              }
+              description="Try removing a filter or set up an alert for when something fits."
+              title="No jobs match these filters"
+            />
           ) : (
             <div className="space-y-2">
               {jobs.map((job) => (

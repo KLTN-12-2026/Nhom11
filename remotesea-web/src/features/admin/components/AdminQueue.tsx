@@ -4,15 +4,14 @@ import {
   Ban,
   Check,
   Clock,
-  Flag,
   Inbox,
   Layers,
   RefreshCw,
-  Shield,
   X,
   Zap,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
 import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
 import { useAdminJobs, useReviewAdminJob } from "@/features/admin/admin.queries";
 import {
@@ -244,9 +243,7 @@ export const AdminQueue = () => {
                       </span>
                     )}
                     {!j.employer.isVerified && (
-                      <span className="flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">
-                        <Flag size={8} /> Unverified employer
-                      </span>
+                      <VerifiedBadge isVerified={false} label="Unverified employer" />
                     )}
                   </div>
                 </div>
@@ -287,15 +284,7 @@ export const AdminQueue = () => {
                   <span className="text-[13px] font-semibold text-neutral-900">
                     {sel.employer.companyName}
                   </span>
-                  {sel.employer.isVerified ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-brand-100 px-2 py-0.5 text-[11px] font-medium text-brand-700">
-                      <Shield size={10} /> Verified
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] text-red-600">
-                      <Flag size={9} /> Unverified
-                    </span>
-                  )}
+                  <VerifiedBadge isVerified={sel.employer.isVerified} size="md" />
                 </div>
                 <h2 className="mb-2 text-[18px] font-semibold text-neutral-900">{sel.title}</h2>
                 <div className="flex flex-wrap gap-1.5">
@@ -422,6 +411,7 @@ export const AdminQueue = () => {
 
             <div className="space-y-3 border-t border-neutral-100 pt-4">
               <textarea
+                aria-label="Note for the employer"
                 className="rounded-10 h-20 w-full resize-none border border-neutral-200 bg-white p-3 text-sm outline-none placeholder:text-neutral-400 focus:border-brand-600 disabled:bg-neutral-50 disabled:text-neutral-400"
                 disabled={!!isResolved}
                 placeholder="Add a note for the employer (sent with change requests & rejections)…"

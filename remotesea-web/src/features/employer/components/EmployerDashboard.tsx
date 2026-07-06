@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Briefcase, Check, ChevronRight, Clock, Plus, ShieldCheck, Star, Users, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useToast } from "@/components/ui/toast";
+import { EmptyRow } from "@/components/shared/EmptyRow";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   useEmployerApplicationsAggregate,
@@ -77,9 +78,7 @@ const ListingsPanel = ({ jobs, applicationsByJob }: ListingsPanelProps) => {
       </div>
 
       {jobs.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-neutral-400">
-          No listings yet. Post your first job to start hiring.
-        </p>
+        <EmptyRow>No listings yet. Post your first job to start hiring.</EmptyRow>
       ) : (
         <>
           <div className="mb-1 grid grid-cols-[1fr_80px_120px_60px_32px] gap-3 px-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
@@ -280,7 +279,7 @@ const ApplicantsPanel = ({ applicants }: ApplicantsPanelProps) => {
       </div>
 
       {list.length === 0 ? (
-        <p className="py-8 text-center text-[13px] text-neutral-400">No applicants yet.</p>
+        <EmptyRow>No applicants yet.</EmptyRow>
       ) : (
         <div className="divide-y divide-neutral-50">
           {list.slice(0, RECENT_APPLICANTS_DISPLAY_COUNT).map((a) => {

@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { Briefcase, Building, Flag, Search, Shield, Wallet } from "lucide-react";
+import { Briefcase, Building, Search, Shield, Wallet } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
+import { EmptyRow } from "@/components/shared/EmptyRow";
 import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
@@ -96,6 +98,7 @@ export const AdminEmployers = () => {
         <div className="ml-auto flex h-9 items-center gap-2 rounded-10 border border-neutral-200 bg-white px-3">
           <Search className="text-neutral-400" size={14} />
           <input
+            aria-label="Search employers"
             className="w-48 bg-transparent text-sm outline-none placeholder:text-neutral-400"
             placeholder="Search employers…"
             value={search}
@@ -117,7 +120,7 @@ export const AdminEmployers = () => {
           <span />
         </div>
         {rows.length === 0 ? (
-          <p className="py-8 text-center text-[13px] text-neutral-400">No employers match this filter.</p>
+          <EmptyRow>No employers match this filter.</EmptyRow>
         ) : (
           rows.map((e) => (
             <div
@@ -130,15 +133,7 @@ export const AdminEmployers = () => {
                 <div>
                   <div className="flex items-center gap-1.5 text-[14px] font-semibold text-neutral-900">
                     {e.companyName}
-                    {e.isVerified ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-brand-100 px-1.5 py-0.5 text-[10px] font-medium text-brand-700">
-                        <Shield size={9} /> Verified
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">
-                        <Flag size={8} /> Unverified
-                      </span>
-                    )}
+                    <VerifiedBadge isVerified={e.isVerified} />
                   </div>
                   <div className="text-[12px] text-neutral-400">
                     {e.user.email} · {e.hqCountry ?? "—"}

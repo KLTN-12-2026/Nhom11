@@ -13,6 +13,7 @@ import {
 import { CompanyLogo } from "@/components/ui/company-logo";
 import { SalaryBadge } from "@/components/ui/salary-badge";
 import { Tag } from "@/components/ui/tag";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { cn } from "@/utils/cn";
 import { useAuth } from "@/contexts/AuthContext";
 import { useMyApplications } from "@/features/applications/applications.queries";
@@ -188,10 +189,11 @@ const ApplicationsTable = ({ applications }: ApplicationsTableProps) => {
       <Pipeline applications={applications} />
 
       {applications.length === 0 ? (
-        <div className="px-5 py-10 text-center text-neutral-500">
-          <p className="mb-1 font-medium text-neutral-900">No applications yet</p>
-          <p className="text-sm">Jobs you apply to will show up here.</p>
-        </div>
+        <EmptyState
+          className="px-5 py-10"
+          description="Jobs you apply to will show up here."
+          title="No applications yet"
+        />
       ) : (
         <div>
           <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-neutral-50 px-5 py-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">

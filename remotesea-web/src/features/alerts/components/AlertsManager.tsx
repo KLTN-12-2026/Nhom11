@@ -1,4 +1,5 @@
 import { useToast } from "@/components/ui/toast";
+import { EmptyRow } from "@/components/shared/EmptyRow";
 import { AlertListItem } from "@/features/alerts/components/AlertListItem";
 import { CreateAlertForm } from "@/features/alerts/components/CreateAlertForm";
 import {
@@ -55,11 +56,9 @@ export const AlertsManager = () => {
 
       <div className="space-y-3">
         {isLoading ? (
-          <p className="py-8 text-center text-[13px] text-neutral-400">Loading alerts…</p>
+          <EmptyRow>Loading alerts…</EmptyRow>
         ) : !alerts || alerts.length === 0 ? (
-          <p className="py-8 text-center text-[13px] text-neutral-400">
-            No alerts yet. Create one above to start getting matched jobs.
-          </p>
+          <EmptyRow>No alerts yet. Create one above to start getting matched jobs.</EmptyRow>
         ) : (
           alerts.map((alert) => (
             <AlertListItem

@@ -159,6 +159,7 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
             </span>
           </div>
           <input
+            aria-label="Minimum salary"
             className="w-full accent-brand-600"
             max={SALARY_CEIL}
             min={SALARY_FLOOR}
@@ -171,6 +172,7 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
             onTouchEnd={commitSalary}
           />
           <input
+            aria-label="Maximum salary"
             className="w-full accent-brand-600"
             max={SALARY_CEIL}
             min={SALARY_FLOOR}

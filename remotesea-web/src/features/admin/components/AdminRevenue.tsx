@@ -1,4 +1,5 @@
 import { CreditCard, RefreshCw, TrendingUp, Wallet } from "lucide-react";
+import { EmptyRow } from "@/components/shared/EmptyRow";
 import { useAdminRevenue } from "@/features/admin/admin.queries";
 import type { RevenueMonthBucket } from "@/types/admin";
 
@@ -154,7 +155,7 @@ export const AdminRevenue = () => {
           <span>Date</span>
         </div>
         {transactions.length === 0 ? (
-          <p className="py-8 text-center text-[13px] text-neutral-400">No paid listings yet.</p>
+          <EmptyRow>No paid listings yet.</EmptyRow>
         ) : (
           transactions.map((t) => (
             <div
