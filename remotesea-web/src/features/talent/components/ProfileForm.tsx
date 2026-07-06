@@ -37,6 +37,12 @@ import {
 import { ROUTES } from "@/constants/routes";
 import type { TalentProfile } from "@/types/talent";
 
+const TEXT_INPUT_CLASS =
+  "rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-100";
+
+const SELECT_INPUT_CLASS =
+  "rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-brand-100";
+
 const PROF_SECTIONS = [
   { id: "basics", label: "Basics", icon: User },
   { id: "about", label: "About you", icon: Asterisk },
@@ -45,6 +51,17 @@ const PROF_SECTIONS = [
   { id: "prefs", label: "Preferences", icon: SlidersHorizontal },
   { id: "links", label: "Links & CV", icon: Share2 },
   { id: "visibility", label: "Visibility", icon: ShieldCheck },
+];
+
+const LINK_FIELDS = [
+  { icon: Code2, label: "GitHub", field: "githubUrl" as const, placeholder: "github.com/you" },
+  { icon: User, label: "LinkedIn", field: "linkedinUrl" as const, placeholder: "linkedin.com/in/you" },
+  {
+    icon: Globe,
+    label: "Portfolio / personal site",
+    field: "portfolioUrl" as const,
+    placeholder: "https://",
+  },
 ];
 
 // No work-history model exists in the backend yet (TalentProfile has no experience
@@ -75,59 +92,62 @@ const SAMPLE_EXPERIENCE = [
   },
 ];
 
-function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      aria-checked={on}
-      className={cn(
-        "relative h-6 w-11 flex-shrink-0 rounded-full border transition-colors",
-        on ? "border-brand-600 bg-brand-600" : "border-neutral-300 bg-neutral-100"
-      )}
-      role="switch"
-      type="button"
-      onClick={() => onChange(!on)}
-    >
-      <span
-        className={cn(
-          "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-          on ? "translate-x-5" : "translate-x-0.5"
-        )}
-      />
-    </button>
-  );
+interface ToggleProps {
+  on: boolean;
+  onChange: (value: boolean) => void;
 }
 
-function SectionHead({
-  eyebrow,
-  title,
-  help,
-}: {
+const Toggle = ({ on, onChange }: ToggleProps) => (
+  <button
+    aria-checked={on}
+    className={cn(
+      "relative h-6 w-11 flex-shrink-0 rounded-full border transition-colors",
+      on ? "border-brand-600 bg-brand-600" : "border-neutral-300 bg-neutral-100"
+    )}
+    role="switch"
+    type="button"
+    onClick={() => onChange(!on)}
+  >
+    <span
+      className={cn(
+        "absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+        on ? "translate-x-5" : "translate-x-0.5"
+      )}
+    />
+  </button>
+);
+
+interface SectionHeadProps {
   eyebrow: string;
   title: React.ReactNode;
   help: string;
-}) {
-  return (
-    <div className="mb-6 grid gap-4 sm:grid-cols-[1fr_220px]">
-      <div>
-        <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-          {eyebrow}
-        </p>
-        <h2 className="text-[22px] font-semibold text-neutral-900">{title}</h2>
-      </div>
-      <p className="text-[13px] leading-relaxed text-neutral-500">{help}</p>
-    </div>
-  );
 }
+
+const SectionHead = ({ eyebrow, title, help }: SectionHeadProps) => (
+  <div className="mb-6 grid gap-4 sm:grid-cols-[1fr_220px]">
+    <div>
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+        {eyebrow}
+      </p>
+      <h2 className="text-[22px] font-semibold text-neutral-900">{title}</h2>
+    </div>
+    <p className="text-[13px] leading-relaxed text-neutral-500">{help}</p>
+  </div>
+);
 
 const emphasis = { fontFamily: "var(--font-serif)" };
 
-export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
+interface ProfileFormProps {
+  profile: TalentProfile | null;
+}
+
+export const ProfileForm = ({ profile }: ProfileFormProps) => {
   const { toast } = useToast();
   const [activeSection, setActiveSection] = useState("basics");
   const [skills, setSkills] = useState<string[]>(profile?.skills.map((s) => s.skill.name) ?? []);
   const { data: allSkills } = useSkills();
-  const updateProfile = useUpdateMyTalentProfile();
-  const updateName = useUpdateMyName();
+  const updateProfileMutation = useUpdateMyTalentProfile();
+  const updateNameMutation = useUpdateMyName();
 
   const {
     register,
@@ -209,7 +229,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
     "resumeUrl",
   ]);
 
-  async function onSubmit(values: ProfileFormValues) {
+  const onSubmit = async (values: ProfileFormValues) => {
     const skillIndex = Object.fromEntries(
       (allSkills ?? []).map((s) => [s.name.toLowerCase(), s.id])
     );
@@ -220,9 +240,9 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
 
     try {
       if (values.name !== (profile?.user?.name ?? "")) {
-        await updateName.mutateAsync(values.name);
+        await updateNameMutation.mutateAsync(values.name);
       }
-      await updateProfile.mutateAsync({
+      await updateProfileMutation.mutateAsync({
         headline: values.headline || undefined,
         bio: values.bio || undefined,
         location: values.location || undefined,
@@ -243,9 +263,9 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
       if (err instanceof ApiError) applyServerErrors(err, setError);
       toast({ variant: "error", title: "Couldn't save profile", description: "Please try again." });
     }
-  }
+  };
 
-  const saving = isSubmitting || updateProfile.isPending || updateName.isPending;
+  const saving = isSubmitting || updateProfileMutation.isPending || updateNameMutation.isPending;
 
   return (
     <div className="min-h-screen bg-[#F8F7F4]">
@@ -325,11 +345,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                   >
                     Full name
                   </label>
-                  <input
-                    className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    id="p-name"
-                    {...register("name")}
-                  />
+                  <input className={TEXT_INPUT_CLASS} id="p-name" {...register("name")} />
                   {errors.name && (
                     <p className="text-[11.5px] text-red-600">{errors.name.message}</p>
                   )}
@@ -342,7 +358,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                     Pronouns <span className="font-normal text-neutral-400">(optional)</span>
                   </label>
                   <input
-                    className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                    className={TEXT_INPUT_CLASS}
                     disabled
                     id="p-pronouns"
                     placeholder="Not tracked yet"
@@ -358,7 +374,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                     </span>
                   </div>
                   <input
-                    className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                    className={TEXT_INPUT_CLASS}
                     placeholder="Role · timezone · standout signal"
                     {...register("headline")}
                   />
@@ -373,11 +389,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                   >
                     Where are you based?
                   </label>
-                  <input
-                    className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    id="p-loc"
-                    {...register("location")}
-                  />
+                  <input className={TEXT_INPUT_CLASS} id="p-loc" {...register("location")} />
                 </div>
                 <div className="space-y-1.5">
                   <label
@@ -386,11 +398,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                   >
                     Working timezone
                   </label>
-                  <select
-                    className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    id="p-tz"
-                    {...register("timezone")}
-                  >
+                  <select className={SELECT_INPUT_CLASS} id="p-tz" {...register("timezone")}>
                     {TIMEZONE_OPTIONS.map((o) => (
                       <option key={o}>{o}</option>
                     ))}
@@ -438,10 +446,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                     <label className="block text-[12.5px] font-medium text-neutral-700">
                       Seniority
                     </label>
-                    <select
-                      className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                      {...register("seniority")}
-                    >
+                    <select className={SELECT_INPUT_CLASS} {...register("seniority")}>
                       {SENIORITY_OPTIONS.map((o) => (
                         <option key={o}>{o}</option>
                       ))}
@@ -451,10 +456,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                     <label className="block text-[12.5px] font-medium text-neutral-700">
                       Years of experience
                     </label>
-                    <select
-                      className="rounded-10 focus:border-brand-500 w-full border border-neutral-200 bg-white px-3.5 py-2.5 text-[13.5px] text-neutral-900 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                      {...register("yearsBucket")}
-                    >
+                    <select className={SELECT_INPUT_CLASS} {...register("yearsBucket")}>
                       {YEARS_BUCKETS.map((o) => (
                         <option key={o}>{o}</option>
                       ))}
@@ -624,26 +626,7 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
                   </div>
                 </div>
 
-                {[
-                  {
-                    icon: Code2,
-                    label: "GitHub",
-                    field: "githubUrl" as const,
-                    placeholder: "github.com/you",
-                  },
-                  {
-                    icon: User,
-                    label: "LinkedIn",
-                    field: "linkedinUrl" as const,
-                    placeholder: "linkedin.com/in/you",
-                  },
-                  {
-                    icon: Globe,
-                    label: "Portfolio / personal site",
-                    field: "portfolioUrl" as const,
-                    placeholder: "https://",
-                  },
-                ].map(({ icon: Icon, label, field, placeholder }) => (
+                {LINK_FIELDS.map(({ icon: Icon, label, field, placeholder }) => (
                   <div className="flex items-center gap-3" key={field}>
                     <span className="rounded-10 flex h-9 w-9 flex-shrink-0 items-center justify-center bg-neutral-100 text-neutral-500">
                       <Icon size={15} />
@@ -723,4 +706,4 @@ export function ProfileForm({ profile }: { profile: TalentProfile | null }) {
       </div>
     </div>
   );
-}
+};

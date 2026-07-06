@@ -11,16 +11,16 @@ const NAV_LINKS = [
   { href: "/blog", label: "Blog" },
 ];
 
-export function Navbar() {
+export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const dashboardHref = user?.role === "EMPLOYER" ? ROUTES.employerDashboard : ROUTES.talent;
 
-  function handleSignOut() {
+  const handleSignOut = () => {
     logout();
     navigate(ROUTES.home);
-  }
+  };
 
   return (
     <header className="sticky top-0 z-50 border-b border-neutral-100 bg-neutral-50/90 backdrop-blur-md">
@@ -119,4 +119,4 @@ export function Navbar() {
       </div>
     </header>
   );
-}
+};

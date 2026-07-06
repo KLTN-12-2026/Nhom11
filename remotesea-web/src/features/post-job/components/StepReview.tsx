@@ -1,10 +1,14 @@
 import { Shield } from "lucide-react";
 import { TIERS, type PostJobFormState } from "@/features/post-job/post-job.schemas";
 
+interface StepReviewProps {
+  form: PostJobFormState;
+}
+
 // Actual payment happens on Stripe's hosted Checkout page after "Pay & publish" —
 // there's no real card-collection endpoint on the backend, so this step is a plain
 // review + redirect rather than a (non-functional) credit card form.
-export function StepReview({ form }: { form: PostJobFormState }) {
+export const StepReview = ({ form }: StepReviewProps) => {
   const tier = TIERS.find((t) => t.id === form.tier) ?? TIERS[0];
 
   return (
@@ -34,4 +38,4 @@ export function StepReview({ form }: { form: PostJobFormState }) {
       </div>
     </div>
   );
-}
+};

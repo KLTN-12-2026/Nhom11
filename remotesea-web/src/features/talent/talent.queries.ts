@@ -3,9 +3,11 @@ import { getMyTalentProfile, getPublicTalentProfile, updateMyTalentProfile } fro
 import { useAuth } from "@/contexts/AuthContext";
 import { ApiError } from "@/services/api-error";
 
+const NOT_FOUND_STATUS = 404;
+
 export const MY_TALENT_PROFILE_KEY = ["talent", "me"];
 
-export function useMyTalentProfile() {
+export const useMyTalentProfile = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: MY_TALENT_PROFILE_KEY,
@@ -13,15 +15,15 @@ export function useMyTalentProfile() {
       try {
         return await getMyTalentProfile();
       } catch (err) {
-        if (err instanceof ApiError && err.status === 404) return null;
+        if (err instanceof ApiError && err.status === NOT_FOUND_STATUS) return null;
         throw err;
       }
     },
     enabled: !!user,
   });
-}
+};
 
-export function useUpdateMyTalentProfile() {
+export const useUpdateMyTalentProfile = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateMyTalentProfile,
@@ -29,12 +31,11 @@ export function useUpdateMyTalentProfile() {
       queryClient.setQueryData(MY_TALENT_PROFILE_KEY, profile);
     },
   });
-}
+};
 
-export function usePublicTalentProfile(slug: string | undefined) {
-  return useQuery({
+export const usePublicTalentProfile = (slug: string | undefined) =>
+  useQuery({
     queryKey: ["talent", "public", slug],
     queryFn: () => getPublicTalentProfile(slug as string),
     enabled: !!slug,
   });
-}

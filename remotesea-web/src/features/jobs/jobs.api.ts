@@ -21,7 +21,7 @@ export type CreateJobPayload = {
   skillIds?: string[];
 };
 
-export async function listJobs(query: JobFilters, limit: number): Promise<JobListResponse> {
+export const listJobs = async (query: JobFilters, limit: number): Promise<JobListResponse> => {
   const { filters } = query;
   const type = filters.jobType.flatMap((label) => JOBTYPE_TO_ENUMS[label] ?? []);
   const level = filters.seniority.flatMap((label) => SENIORITY_TO_LEVELS[label] ?? []);
@@ -42,16 +42,16 @@ export async function listJobs(query: JobFilters, limit: number): Promise<JobLis
     },
   });
   return data;
-}
+};
 
-export async function getJob(id: string): Promise<Job> {
+export const getJob = async (id: string): Promise<Job> => {
   const { data } = await apiClient.get<Job>(`/jobs/${id}`);
   return data;
-}
+};
 
-export async function createJob(
+export const createJob = async (
   payload: CreateJobPayload
-): Promise<{ id: string; slug: string; status: string }> {
+): Promise<{ id: string; slug: string; status: string }> => {
   const { data } = await apiClient.post("/jobs", payload);
   return data;
-}
+};

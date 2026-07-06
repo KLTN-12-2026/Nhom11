@@ -6,31 +6,26 @@ import { AccountNameForm } from "@/features/settings/components/AccountNameForm"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-function SectionHead({
-  eyebrow,
-  title,
-  help,
-  icon: Icon,
-}: {
+interface SectionHeadProps {
   eyebrow: string;
   title: string;
   help: string;
   icon: React.ElementType;
-}) {
-  return (
-    <div className="mb-6 grid gap-4 sm:grid-cols-[1fr_220px]">
-      <div>
-        <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-          <Icon size={12} /> {eyebrow}
-        </p>
-        <h2 className="text-[22px] font-semibold text-neutral-900">{title}</h2>
-      </div>
-      <p className="text-[13px] leading-relaxed text-neutral-500">{help}</p>
-    </div>
-  );
 }
 
-export function SettingsPage() {
+const SectionHead = ({ eyebrow, title, help, icon: Icon }: SectionHeadProps) => (
+  <div className="mb-6 grid gap-4 sm:grid-cols-[1fr_220px]">
+    <div>
+      <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+        <Icon size={12} /> {eyebrow}
+      </p>
+      <h2 className="text-[22px] font-semibold text-neutral-900">{title}</h2>
+    </div>
+    <p className="text-[13px] leading-relaxed text-neutral-500">{help}</p>
+  </div>
+);
+
+export const SettingsPage = () => {
   useDocumentTitle("Settings");
 
   return (
@@ -106,4 +101,4 @@ export function SettingsPage() {
       </div>
     </div>
   );
-}
+};

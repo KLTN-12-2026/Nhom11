@@ -23,17 +23,21 @@ type AuthContextValue = {
   patchUser: (partial: Partial<AuthUser>) => void;
 };
 
+interface AuthProviderProps {
+  children: React.ReactNode;
+}
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-async function hydrateFromSession(): Promise<AuthUser | null> {
+const hydrateFromSession = async (): Promise<AuthUser | null> => {
   try {
     return await authApi.getSession();
   } catch {
     return null;
   }
-}
+};
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
+export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>(() =>
     getAccessToken() ? "loading" : "unauthenticated"
@@ -95,10 +99,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
+};
 
-export function useAuth(): AuthContextValue {
+export const useAuth = (): AuthContextValue => {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
-}
+};

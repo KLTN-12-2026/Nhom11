@@ -13,6 +13,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
 import { useAdminJobs, useReviewAdminJob } from "@/features/admin/admin.queries";
 import {
   autoChecks,
@@ -22,6 +23,7 @@ import {
   LEVEL_LABELS,
   PLAN_LABELS,
   REVIEW_CHECKLIST,
+  URGENT_WAIT_HOURS,
   waitCls,
   waitFmt,
   type AutoState,
@@ -40,37 +42,29 @@ const AUTO_COLOR: Record<AutoState, string> = {
   fail: "bg-red-100 text-red-700",
 };
 
-function CompanyInitial({ name, size = 36 }: { name: string; size?: number }) {
-  return (
-    <div
-      aria-label={name}
-      className="rounded-10 grid flex-shrink-0 place-items-center font-semibold text-white"
-      style={{ background: "#9B9690", width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {name[0]?.toUpperCase()}
-    </div>
-  );
-}
+const HOURS_PER_DAY = 24;
+const RESOLUTION_BANNER_DISPLAY_MS = 1200;
 
-function submittedLabel(dateString: string): string {
+type ResolutionKind = "approved" | "changes" | "rejected";
+
+const submittedLabel = (dateString: string): string => {
   const h = hoursSince(dateString);
   if (h < 1) return "Just now";
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
+  if (h < HOURS_PER_DAY) return `${h}h ago`;
+  return `${Math.floor(h / HOURS_PER_DAY)}d ago`;
+};
 
-export function AdminQueue() {
+const jobRegion = (j: AdminJob): string => j.country ?? (j.isRemote ? "Remote" : "—");
+
+export const AdminQueue = () => {
   const { toast } = useToast();
   const { data, isLoading } = useAdminJobs("PENDING_REVIEW");
-  const reviewJob = useReviewAdminJob();
+  const reviewJobMutation = useReviewAdminJob();
 
-  const [resolved, setResolved] = useState<Record<string, "approved" | "changes" | "rejected">>({});
+  const [resolved, setResolved] = useState<Record<string, ResolutionKind>>({});
   const [checked, setChecked] = useState<Record<string, Set<number>>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
-  const [banner, setBanner] = useState<{
-    id: string;
-    kind: "approved" | "changes" | "rejected";
-  } | null>(null);
+  const [banner, setBanner] = useState<{ id: string; kind: ResolutionKind } | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
 
   const queue = data?.jobs ?? [];
@@ -86,7 +80,7 @@ export function AdminQueue() {
   const isResolved = sel && resolved[sel.id];
   const selChecked = (effectiveSelId && checked[effectiveSelId]) || new Set<number>();
 
-  function toggle(i: number) {
+  const toggleChecklistItem = (i: number) => {
     if (!effectiveSelId) return;
     setChecked((prev) => {
       const cur = new Set(prev[effectiveSelId] ?? []);
@@ -94,14 +88,14 @@ export function AdminQueue() {
       else cur.add(i);
       return { ...prev, [effectiveSelId]: cur };
     });
-  }
+  };
 
-  async function decide(kind: "approved" | "changes" | "rejected") {
+  const decide = async (kind: ResolutionKind) => {
     if (!effectiveSelId) return;
     const decidedId = effectiveSelId;
     const action = kind === "approved" ? "approve" : "reject";
     try {
-      await reviewJob.mutateAsync({ id: decidedId, action, note: notes[decidedId] || undefined });
+      await reviewJobMutation.mutateAsync({ id: decidedId, action, note: notes[decidedId] || undefined });
       toast({
         variant: kind === "approved" ? "success" : "info",
         title: kind === "approved" ? "Job approved & published" : "Job sent back to employer",
@@ -111,11 +105,11 @@ export function AdminQueue() {
       setTimeout(() => {
         setBanner(null);
         setSelId(null);
-      }, 1200);
+      }, RESOLUTION_BANNER_DISPLAY_MS);
     } catch {
       toast({ variant: "error", title: "Couldn't submit review" });
     }
-  }
+  };
 
   if (isLoading) {
     return <p className="text-sm text-neutral-400">Loading queue…</p>;
@@ -135,7 +129,7 @@ export function AdminQueue() {
   const reqCount = REVIEW_CHECKLIST.length;
   const doneCount = selChecked.size;
   const allDone = doneCount === reqCount;
-  const overdue = active.filter((j) => hoursSince(j.createdAt) >= 24).length;
+  const overdue = active.filter((j) => hoursSince(j.createdAt) >= URGENT_WAIT_HOURS).length;
   const avgWait = active.length
     ? Math.round(active.reduce((a, j) => a + hoursSince(j.createdAt), 0) / active.length)
     : 0;
@@ -154,10 +148,6 @@ export function AdminQueue() {
   ];
   const auto = autoChecks(sel);
   const selWaitH = hoursSince(sel.createdAt);
-
-  function jobRegion(j: AdminJob): string {
-    return j.country ?? (j.isRemote ? "Remote" : "—");
-  }
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -187,7 +177,7 @@ export function AdminQueue() {
             label: "Avg. wait",
             val: waitFmt(avgWait),
             sub: "SLA 24h",
-            warn: avgWait >= 24,
+            warn: avgWait >= URGENT_WAIT_HOURS,
           },
           {
             icon: <Check size={14} />,
@@ -398,7 +388,7 @@ export function AdminQueue() {
                     <div
                       className={`rounded-10 flex cursor-pointer items-start gap-3 border p-3 transition-all ${done ? "border-brand-200 bg-brand-50" : "border-neutral-100 bg-white hover:border-neutral-200"}`}
                       key={c.label}
-                      onClick={() => !isResolved && toggle(i)}
+                      onClick={() => !isResolved && toggleChecklistItem(i)}
                     >
                       <span
                         className={`mt-0.5 grid h-5 w-5 flex-shrink-0 place-items-center rounded-full border-2 ${done ? "border-brand-600 bg-brand-600 text-white" : "border-neutral-200 text-transparent"}`}
@@ -451,21 +441,21 @@ export function AdminQueue() {
                 <div className="flex gap-2">
                   <button
                     className={`rounded-10 inline-flex h-9 items-center gap-1.5 px-4 text-sm font-medium transition-colors ${allDone ? "bg-brand-600 text-white hover:bg-brand-700" : "cursor-not-allowed bg-neutral-100 text-neutral-400"}`}
-                    disabled={!allDone || reviewJob.isPending}
+                    disabled={!allDone || reviewJobMutation.isPending}
                     onClick={() => allDone && decide("approved")}
                   >
                     <Check size={14} /> Approve &amp; publish
                   </button>
                   <button
                     className="rounded-10 inline-flex h-9 items-center gap-1.5 border border-amber-200 bg-amber-50 px-4 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-60"
-                    disabled={reviewJob.isPending}
+                    disabled={reviewJobMutation.isPending}
                     onClick={() => decide("changes")}
                   >
                     <RefreshCw size={14} /> Request changes
                   </button>
                   <button
                     className="rounded-10 inline-flex h-9 items-center gap-1.5 border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:opacity-60"
-                    disabled={reviewJob.isPending}
+                    disabled={reviewJobMutation.isPending}
                     onClick={() => decide("rejected")}
                   >
                     <Ban size={14} /> Reject
@@ -478,4 +468,4 @@ export function AdminQueue() {
       </div>
     </div>
   );
-}
+};

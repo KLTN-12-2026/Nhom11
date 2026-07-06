@@ -4,7 +4,7 @@ import { ForgotPasswordForm } from "@/features/auth/components/ForgotPasswordFor
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-export function ForgotPasswordPage() {
+export const ForgotPasswordPage = () => {
   useDocumentTitle("Forgot Password");
 
   return (
@@ -26,4 +26,4 @@ export function ForgotPasswordPage() {
       <ForgotPasswordForm />
     </div>
   );
-}
+};

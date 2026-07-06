@@ -65,23 +65,30 @@ const APPLICANTS = [
 
 type CellValue = boolean | "partial";
 
-function CompareCell({ v, highlight }: { v: CellValue; highlight?: boolean }) {
-  if (v === true)
+interface CompareCellProps {
+  v: CellValue;
+  highlight?: boolean;
+}
+
+const CompareCell = ({ v, highlight }: CompareCellProps) => {
+  if (v === true) {
     return (
       <span className={`inline-grid h-7 w-7 place-items-center rounded-full ${highlight ? "bg-brand-600 text-white" : "bg-neutral-100 text-neutral-400"}`}>
         <Check size={13} />
       </span>
     );
-  if (v === false)
+  }
+  if (v === false) {
     return (
       <span className="inline-grid h-7 w-7 place-items-center rounded-full text-neutral-300">
         <Minus size={13} />
       </span>
     );
+  }
   return <span className="text-[11px] font-medium uppercase tracking-wide text-amber-700">partial</span>;
-}
+};
 
-export function EmployerMarketingPage() {
+export const EmployerMarketingPage = () => {
   useDocumentTitle("For Employers — Hire Vietnam Remote Talent");
 
   return (
@@ -436,4 +443,4 @@ export function EmployerMarketingPage() {
       </section>
     </>
   );
-}
+};

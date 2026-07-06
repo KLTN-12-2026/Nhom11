@@ -1,43 +1,13 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Bookmark } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { useToast } from "@/components/ui/toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSavedJobs, useToggleSavedJob } from "@/features/saved/saved.queries";
-import { ROUTES } from "@/constants/routes";
+import { useSavedJobToggle } from "@/features/jobs/useSavedJobToggle";
 
-export function SaveJobButton({ jobId }: { jobId: string }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { data: savedJobs, isLoading: savedStatusLoading } = useSavedJobs();
-  const toggleSaved = useToggleSavedJob();
-  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
+interface SaveJobButtonProps {
+  jobId: string;
+}
 
-  // The original app computed initialSaved server-side before first paint, so the
-  // button never rendered a wrong state. This is a client-only query instead, so
-  // while it's resolving for a signed-in user, show a neutral placeholder rather
-  // than defaulting to "unsaved" and flashing to "Saved" once it loads.
-  const statusUnknown = !!user && savedStatusLoading;
-  const savedFromServer = savedJobs?.some((s) => s.jobId === jobId) ?? false;
-  const saved = optimisticSaved ?? savedFromServer;
-
-  async function toggle() {
-    if (!user) {
-      navigate(`${ROUTES.login}?callbackUrl=${encodeURIComponent(`/jobs/${jobId}`)}`);
-      return;
-    }
-    const prev = saved;
-    setOptimisticSaved(!prev);
-    try {
-      await toggleSaved.mutateAsync(jobId);
-      toast({ variant: "success", title: prev ? "Removed from saved" : "Saved to your list" });
-    } catch {
-      setOptimisticSaved(prev);
-      toast({ variant: "error", title: "Couldn't update saved jobs" });
-    }
-  }
+export const SaveJobButton = ({ jobId }: SaveJobButtonProps) => {
+  const { saved, statusUnknown, toggle } = useSavedJobToggle(jobId, `/jobs/${jobId}`);
 
   return (
     <button
@@ -51,10 +21,10 @@ export function SaveJobButton({ jobId }: { jobId: string }) {
       )}
       disabled={statusUnknown}
       type="button"
-      onClick={toggle}
+      onClick={() => toggle()}
     >
       <Bookmark className={statusUnknown ? "text-transparent" : undefined} fill={saved ? "currentColor" : "none"} size={15} />
       {saved ? "Saved" : "Save for later"}
     </button>
   );
-}
+};

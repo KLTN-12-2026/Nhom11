@@ -24,34 +24,29 @@ import type { ApplicantWithJob } from "@/features/employer/employer.queries";
 import type { ApplicationStatus } from "@/types/application";
 import type { EmployerApplicant, EmployerJobListItem } from "@/types/employer";
 
-function KpiCard({
-  label,
-  icon: Icon,
-  value,
-  sub,
-}: {
+interface KpiCardProps {
   label: string;
   icon: React.ElementType;
   value: string;
   sub: string;
-}) {
-  return (
-    <div className="rounded-20 border border-neutral-100 bg-white p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-[12px] font-medium uppercase tracking-wider text-neutral-400">{label}</p>
-        <span className="flex h-7 w-7 items-center justify-center rounded-8 bg-neutral-100">
-          <Icon className="text-neutral-500" size={14} />
-        </span>
-      </div>
-      <div className="flex items-end gap-2">
-        <span className="text-[30px] font-semibold leading-none tracking-tight text-neutral-900">
-          {value}
-        </span>
-      </div>
-      <p className="mt-1 text-[12px] text-neutral-400">{sub}</p>
-    </div>
-  );
 }
+
+const KpiCard = ({ label, icon: Icon, value, sub }: KpiCardProps) => (
+  <div className="rounded-20 border border-neutral-100 bg-white p-5">
+    <div className="mb-4 flex items-center justify-between">
+      <p className="text-[12px] font-medium uppercase tracking-wider text-neutral-400">{label}</p>
+      <span className="flex h-7 w-7 items-center justify-center rounded-8 bg-neutral-100">
+        <Icon className="text-neutral-500" size={14} />
+      </span>
+    </div>
+    <div className="flex items-end gap-2">
+      <span className="text-[30px] font-semibold leading-none tracking-tight text-neutral-900">
+        {value}
+      </span>
+    </div>
+    <p className="mt-1 text-[12px] text-neutral-400">{sub}</p>
+  </div>
+);
 
 const STATUS_MAP: Record<string, string> = {
   review: "bg-amber-50 text-amber-700 border-amber-200",
@@ -59,13 +54,12 @@ const STATUS_MAP: Record<string, string> = {
   closed: "bg-neutral-100 text-neutral-500 border-neutral-200",
 };
 
-function ListingsPanel({
-  jobs,
-  applicationsByJob,
-}: {
+interface ListingsPanelProps {
   jobs: EmployerJobListItem[];
   applicationsByJob: Map<string, EmployerApplicant[]>;
-}) {
+}
+
+const ListingsPanel = ({ jobs, applicationsByJob }: ListingsPanelProps) => {
   const active = jobs.filter((j) => STATUS_GROUP[j.status] !== "closed").length;
 
   return (
@@ -176,14 +170,36 @@ function ListingsPanel({
       )}
     </div>
   );
+};
+
+type ApplicantTabId = "all" | "new" | "shortlisted";
+
+const RECENT_APPLICANTS_DISPLAY_COUNT = 8;
+
+const APPLICANT_STATUS_CLASS: Record<ApplicantStatusGroup, string> = {
+  new: "bg-blue-50 text-blue-700",
+  reviewing: "bg-brand-50 text-brand-700",
+  shortlisted: "bg-emerald-50 text-emerald-700",
+  archived: "bg-neutral-100 text-neutral-500",
+};
+
+const APPLICANT_STATUS_LABEL: Record<ApplicantStatusGroup, string> = {
+  new: "New",
+  reviewing: "Reviewing",
+  shortlisted: "Shortlisted",
+  archived: "Archived",
+};
+
+interface ApplicantsPanelProps {
+  applicants: ApplicantWithJob[];
 }
 
-function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
+const ApplicantsPanel = ({ applicants }: ApplicantsPanelProps) => {
   const { toast } = useToast();
-  const updateStatus = useUpdateApplicationStatus();
-  const [tab, setTab] = useState<"all" | "new" | "shortlisted">("all");
+  const updateStatusMutation = useUpdateApplicationStatus();
+  const [tab, setTab] = useState<ApplicantTabId>("all");
 
-  const tabs: { id: "all" | "new" | "shortlisted"; label: string; count: number }[] = [
+  const tabs: { id: ApplicantTabId; label: string; count: number }[] = [
     { id: "all", label: "All", count: applicants.length },
     { id: "new", label: "New", count: applicants.filter((a) => APPLICANT_STATUS[a.status] === "new").length },
     {
@@ -194,22 +210,9 @@ function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
   ];
   const list = tab === "all" ? applicants : applicants.filter((a) => APPLICANT_STATUS[a.status] === tab);
 
-  const statusCls: Record<ApplicantStatusGroup, string> = {
-    new: "bg-blue-50 text-blue-700",
-    reviewing: "bg-brand-50 text-brand-700",
-    shortlisted: "bg-emerald-50 text-emerald-700",
-    archived: "bg-neutral-100 text-neutral-500",
-  };
-  const statusLabel: Record<ApplicantStatusGroup, string> = {
-    new: "New",
-    reviewing: "Reviewing",
-    shortlisted: "Shortlisted",
-    archived: "Archived",
-  };
-
-  async function act(id: string, status: ApplicationStatus) {
+  const updateApplicantStatus = async (id: string, status: ApplicationStatus) => {
     try {
-      await updateStatus.mutateAsync({ id, status });
+      await updateStatusMutation.mutateAsync({ id, status });
       toast({
         variant: status === "REJECTED" ? "info" : "success",
         title: status === "REJECTED" ? "Applicant rejected" : "Applicant advanced",
@@ -217,7 +220,7 @@ function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
     } catch {
       toast({ variant: "error", title: "Couldn't update applicant" });
     }
-  }
+  };
 
   return (
     <div className="rounded-20 border border-neutral-100 bg-white p-5">
@@ -252,7 +255,7 @@ function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
         <p className="py-8 text-center text-[13px] text-neutral-400">No applicants yet.</p>
       ) : (
         <div className="divide-y divide-neutral-50">
-          {list.slice(0, 8).map((a) => {
+          {list.slice(0, RECENT_APPLICANTS_DISPLAY_COUNT).map((a) => {
             const name = a.talent.user.name ?? "Candidate";
             const initial = name.split(" ").slice(-1)[0]?.[0]?.toUpperCase() ?? "C";
             const group = APPLICANT_STATUS[a.status];
@@ -277,8 +280,8 @@ function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
                 </div>
 
                 <div className="flex-shrink-0 text-right">
-                  <div className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", statusCls[group])}>
-                    {statusLabel[group]}
+                  <div className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", APPLICANT_STATUS_CLASS[group])}>
+                    {APPLICANT_STATUS_LABEL[group]}
                   </div>
                 </div>
 
@@ -286,18 +289,18 @@ function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
                   <div className="flex flex-shrink-0 items-center gap-1">
                     <button
                       className="inline-flex items-center gap-1 rounded-8 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-50"
-                      disabled={updateStatus.isPending}
+                      disabled={updateStatusMutation.isPending}
                       type="button"
-                      onClick={() => act(a.id, nextStatus)}
+                      onClick={() => updateApplicantStatus(a.id, nextStatus)}
                     >
                       <Check size={11} /> {NEXT_LABEL[a.status]}
                     </button>
                     <button
                       aria-label="Reject applicant"
                       className="grid h-7 w-7 place-items-center rounded-8 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                      disabled={updateStatus.isPending}
+                      disabled={updateStatusMutation.isPending}
                       type="button"
-                      onClick={() => act(a.id, "REJECTED")}
+                      onClick={() => updateApplicantStatus(a.id, "REJECTED")}
                     >
                       <X size={13} />
                     </button>
@@ -312,44 +315,48 @@ function ApplicantsPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
       )}
     </div>
   );
+};
+
+interface CompanyCardProps {
+  company: { companyName: string; isVerified: boolean; hqCountry: string | null };
 }
 
-function CompanyCard({
-  company,
-}: {
-  company: { companyName: string; isVerified: boolean; hqCountry: string | null };
-}) {
-  return (
-    <div className="rounded-20 border border-neutral-100 bg-white p-5">
-      <div className="mb-4 flex items-center gap-3">
-        <div className="flex h-12 w-12 items-center justify-center rounded-12 bg-gradient-to-br from-brand-400 to-brand-700 text-[18px] font-bold text-white">
-          {company.companyName.charAt(0).toUpperCase()}
-        </div>
-        <div>
-          <p className="text-[15px] font-semibold text-neutral-900">{company.companyName}</p>
-          <div className="flex items-center gap-1.5 text-[12px] text-neutral-500">
-            {company.isVerified && (
-              <span className="inline-flex items-center gap-0.5 text-brand-700">
-                <ShieldCheck size={11} /> Verified
-              </span>
-            )}
-            {company.hqCountry && <span>· {company.hqCountry}</span>}
-          </div>
+const CompanyCard = ({ company }: CompanyCardProps) => (
+  <div className="rounded-20 border border-neutral-100 bg-white p-5">
+    <div className="mb-4 flex items-center gap-3">
+      <div className="flex h-12 w-12 items-center justify-center rounded-12 bg-gradient-to-br from-brand-400 to-brand-700 text-[18px] font-bold text-white">
+        {company.companyName.charAt(0).toUpperCase()}
+      </div>
+      <div>
+        <p className="text-[15px] font-semibold text-neutral-900">{company.companyName}</p>
+        <div className="flex items-center gap-1.5 text-[12px] text-neutral-500">
+          {company.isVerified && (
+            <span className="inline-flex items-center gap-0.5 text-brand-700">
+              <ShieldCheck size={11} /> Verified
+            </span>
+          )}
+          {company.hqCountry && <span>· {company.hqCountry}</span>}
         </div>
       </div>
     </div>
-  );
+  </div>
+);
+
+interface FunnelPanelProps {
+  applicants: ApplicantWithJob[];
 }
 
-function FunnelPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
+const MIN_FUNNEL_BAR_PCT = 6;
+
+const FunnelPanel = ({ applicants }: FunnelPanelProps) => {
   const total = applicants.length;
-  const count = (pred: (a: ApplicantWithJob) => boolean) => applicants.filter(pred).length;
+  const countWhere = (pred: (a: ApplicantWithJob) => boolean) => applicants.filter(pred).length;
   // Exact per-stage counts, not cumulative — matches the original's countBy("SHORTLISTED")
   // etc. (a candidate currently INTERVIEW-ing is no longer counted as "Shortlisted").
-  const reviewed = count((a) => a.status !== "PENDING");
-  const shortlisted = count((a) => a.status === "SHORTLISTED");
-  const interviewing = count((a) => a.status === "INTERVIEW");
-  const offers = count((a) => a.status === "OFFERED");
+  const reviewed = countWhere((a) => a.status !== "PENDING");
+  const shortlisted = countWhere((a) => a.status === "SHORTLISTED");
+  const interviewing = countWhere((a) => a.status === "INTERVIEW");
+  const offers = countWhere((a) => a.status === "OFFERED");
 
   const funnel = [
     { label: "Applications", n: total, pct: 100, amber: false },
@@ -371,7 +378,7 @@ function FunnelPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
             <div className="flex-1 overflow-hidden rounded-full bg-neutral-100">
               <div
                 className={cn("h-2 rounded-full transition-all", f.amber ? "bg-amber-400" : "bg-brand-500")}
-                style={{ width: `${Math.max(f.pct, total ? 6 : 0)}%` }}
+                style={{ width: `${Math.max(f.pct, total ? MIN_FUNNEL_BAR_PCT : 0)}%` }}
               />
             </div>
             <span className="w-6 flex-shrink-0 text-right text-[12px] font-semibold text-neutral-700">{f.n}</span>
@@ -380,9 +387,9 @@ function FunnelPanel({ applicants }: { applicants: ApplicantWithJob[] }) {
       </div>
     </div>
   );
-}
+};
 
-export function EmployerDashboard() {
+export const EmployerDashboard = () => {
   const { user } = useAuth();
   const { data: profile } = useEmployerProfile();
   const { data: jobsData } = useEmployerJobs();
@@ -485,4 +492,4 @@ export function EmployerDashboard() {
       </div>
     </div>
   );
-}
+};

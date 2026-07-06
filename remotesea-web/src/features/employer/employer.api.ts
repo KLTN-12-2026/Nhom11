@@ -9,47 +9,47 @@ import type {
   UpdateEmployerProfilePayload,
 } from "@/types/employer";
 
-export async function createEmployerProfile(
+export const createEmployerProfile = async (
   payload: CreateEmployerProfilePayload
-): Promise<{ id: string; slug: string; companyName: string }> {
+): Promise<{ id: string; slug: string; companyName: string }> => {
   const { data } = await apiClient.post("/employer/profile", payload);
   return data;
-}
+};
 
-export async function getEmployerProfile(): Promise<EmployerProfileSummary> {
+export const getEmployerProfile = async (): Promise<EmployerProfileSummary> => {
   const { data } = await apiClient.get<EmployerProfileSummary>("/employer/profile");
   return data;
-}
+};
 
-export async function updateEmployerProfile(
+export const updateEmployerProfile = async (
   payload: UpdateEmployerProfilePayload
-): Promise<EmployerProfileSummary> {
+): Promise<EmployerProfileSummary> => {
   const { data } = await apiClient.patch<EmployerProfileSummary>("/employer/profile", payload);
   return data;
-}
+};
 
-export async function listEmployerJobs(status?: JobStatus): Promise<EmployerJobsResponse> {
+export const listEmployerJobs = async (status?: JobStatus): Promise<EmployerJobsResponse> => {
   const { data } = await apiClient.get<EmployerJobsResponse>("/employer/jobs", {
     params: status ? { status } : undefined,
   });
   return data;
-}
+};
 
-export async function listJobApplications(
+export const listJobApplications = async (
   jobId: string,
   params: { status?: ApplicationStatus; page?: number; limit?: number } = {}
-): Promise<EmployerJobApplicationsResponse> {
+): Promise<EmployerJobApplicationsResponse> => {
   const { data } = await apiClient.get<EmployerJobApplicationsResponse>(
     `/employer/jobs/${jobId}/applications`,
     { params }
   );
   return data;
-}
+};
 
-export async function updateApplicationStatus(
+export const updateApplicationStatus = async (
   applicationId: string,
   status: ApplicationStatus,
   notes?: string
-): Promise<void> {
+): Promise<void> => {
   await apiClient.patch(`/employer/applications/${applicationId}`, { status, notes });
-}
+};

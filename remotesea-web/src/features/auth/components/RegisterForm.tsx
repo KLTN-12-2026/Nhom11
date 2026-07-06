@@ -4,19 +4,26 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useNavigate } from "react-router-dom";
 import { registerSchema, type RegisterFormValues } from "@/features/auth/auth.schemas";
 import { OAuthButtons } from "@/features/auth/components/OAuthButtons";
+import { OrDivider } from "@/features/auth/components/OrDivider";
+import { TextField } from "@/components/shared/TextField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { ApiError } from "@/services/api-error";
-import { applyServerErrors } from "@/utils/form-errors";
+import { applyFormSubmitError } from "@/utils/form-errors";
 import { ROUTES } from "@/constants/routes";
 import { cn } from "@/utils/cn";
 
-const ROLES = [
+const ROLE_OPTIONS = [
   { value: "TALENT", label: "I'm looking for work" },
   { value: "EMPLOYER", label: "I'm hiring" },
 ] as const;
 
-export function RegisterForm() {
+const DUPLICATE_EMAIL_STATUS = 409;
+
+const resolveRegisterErrorMessage = (error: ApiError): string =>
+  error.status === DUPLICATE_EMAIL_STATUS ? "That email is already registered." : error.message;
+
+export const RegisterForm = () => {
   const navigate = useNavigate();
   const { registerAccount } = useAuth();
   const { toast } = useToast();
@@ -36,96 +43,73 @@ export function RegisterForm() {
 
   const role = watch("role");
 
-  async function onSubmit(values: RegisterFormValues) {
+  const onSubmit = async (values: RegisterFormValues) => {
     setFormError(null);
     try {
       const user = await registerAccount(values);
       navigate(user.role === "EMPLOYER" ? ROUTES.employerDashboard : "/profile", { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) {
-        applyServerErrors(err, setError);
-        setFormError(
-          err.status === 409 ? "That email is already registered." : err.message
-        );
-      } else {
-        setFormError("Please check your details and try again.");
-      }
+      setFormError(
+        applyFormSubmitError(
+          err,
+          setError,
+          "Please check your details and try again.",
+          resolveRegisterErrorMessage
+        )
+      );
       toast({ title: "Registration failed", variant: "error" });
     }
-  }
+  };
 
   return (
     <>
       <div className="mb-6 grid grid-cols-2 gap-2">
-        {ROLES.map((r) => (
+        {ROLE_OPTIONS.map((option) => (
           <button
             className={cn(
               "h-10 rounded-12 border text-sm font-medium transition-all",
-              role === r.value
+              role === option.value
                 ? "border-brand-600 bg-brand-50 text-brand-700"
                 : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
             )}
-            key={r.value}
+            key={option.value}
             type="button"
-            onClick={() => setValue("role", r.value)}
+            onClick={() => setValue("role", option.value)}
           >
-            {r.label}
+            {option.label}
           </button>
         ))}
       </div>
 
       <OAuthButtons />
-
-      <div className="mb-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-neutral-200" />
-        <span className="text-[11px] font-medium uppercase tracking-widest text-neutral-400">
-          or with email
-        </span>
-        <div className="h-px flex-1 bg-neutral-200" />
-      </div>
+      <OrDivider label="or with email" />
 
       <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-neutral-700" htmlFor="name">
-            Full name
-          </label>
-          <input
-            className="h-11 w-full rounded-12 border border-neutral-200 bg-white px-4 text-sm outline-none transition-all placeholder:text-neutral-400 focus:border-brand-600 focus:shadow-focus"
-            id="name"
-            placeholder="Phạm Tuấn"
-            type="text"
-            {...register("name")}
-          />
-          {errors.name && <p className="mt-1 text-xs text-red-600">{errors.name.message}</p>}
-        </div>
+        <TextField
+          error={errors.name?.message}
+          id="name"
+          label="Full name"
+          placeholder="Phạm Tuấn"
+          registration={register("name")}
+        />
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-neutral-700" htmlFor="email">
-            Email
-          </label>
-          <input
-            className="h-11 w-full rounded-12 border border-neutral-200 bg-white px-4 text-sm outline-none transition-all placeholder:text-neutral-400 focus:border-brand-600 focus:shadow-focus"
-            id="email"
-            placeholder="you@example.com"
-            type="email"
-            {...register("email")}
-          />
-          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email.message}</p>}
-        </div>
+        <TextField
+          error={errors.email?.message}
+          id="email"
+          label="Email"
+          placeholder="you@example.com"
+          registration={register("email")}
+          type="email"
+        />
 
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-neutral-700" htmlFor="password">
-            Password
-          </label>
-          <input
-            className="h-11 w-full rounded-12 border border-neutral-200 bg-white px-4 text-sm outline-none transition-all placeholder:text-neutral-400 focus:border-brand-600 focus:shadow-focus"
-            id="password"
-            placeholder="At least 8 characters"
-            type="password"
-            {...register("password")}
-          />
-          {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
-        </div>
+        <TextField
+          error={errors.password?.message}
+          id="password"
+          label="Password"
+          placeholder="At least 8 characters"
+          registration={register("password")}
+          type="password"
+        />
 
         {formError && <p className="text-sm text-red-600">{formError}</p>}
 
@@ -150,4 +134,4 @@ export function RegisterForm() {
       </form>
     </>
   );
-}
+};

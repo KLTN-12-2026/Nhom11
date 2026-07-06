@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-export function NotFoundPage() {
+export const NotFoundPage = () => {
   useDocumentTitle("Page Not Found");
 
   return (
@@ -18,4 +18,4 @@ export function NotFoundPage() {
       </Link>
     </div>
   );
-}
+};

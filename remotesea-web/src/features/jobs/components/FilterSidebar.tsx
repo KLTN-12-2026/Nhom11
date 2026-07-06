@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useCategories } from "@/features/taxonomy/taxonomy.queries";
@@ -12,55 +12,53 @@ import {
 } from "@/features/jobs/job-filters";
 import type { JobFacets } from "@/types/job";
 
-type FilterSidebarProps = {
+interface FilterSidebarProps {
   filters: Filters;
   onChange: (filters: Filters) => void;
   facets: JobFacets;
-};
+}
 
-function CheckRow({
-  checked,
-  label,
-  count,
-  onToggle,
-}: {
+interface CheckRowProps {
   checked: boolean;
   label: string;
   count: number;
   onToggle: () => void;
-}) {
-  return (
-    <label
-      className={cn(
-        "flex cursor-pointer select-none items-center gap-2.5 py-1.5 text-[13.5px] transition-colors",
-        checked ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
-      )}
-      onClick={onToggle}
-    >
-      <span
-        className={cn(
-          "grid h-4 w-4 flex-shrink-0 place-items-center rounded-[4px] border transition-all",
-          checked ? "border-brand-600 bg-brand-600" : "border-neutral-300 bg-white"
-        )}
-      >
-        {checked && <Check className="text-white" size={10} strokeWidth={3} />}
-      </span>
-      <span className="flex-1">{label}</span>
-      <span className="text-[11px] tabular-nums text-neutral-400">{count}</span>
-    </label>
-  );
 }
 
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="border-b border-neutral-100 py-4 last:border-0">
-      <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-widest text-neutral-400">
-        {label}
-      </div>
-      {children}
-    </div>
-  );
+const CheckRow = ({ checked, label, count, onToggle }: CheckRowProps) => (
+  <label
+    className={cn(
+      "flex cursor-pointer select-none items-center gap-2.5 py-1.5 text-[13.5px] transition-colors",
+      checked ? "text-neutral-900" : "text-neutral-500 hover:text-neutral-900"
+    )}
+    onClick={onToggle}
+  >
+    <span
+      className={cn(
+        "grid h-4 w-4 flex-shrink-0 place-items-center rounded-[4px] border transition-all",
+        checked ? "border-brand-600 bg-brand-600" : "border-neutral-300 bg-white"
+      )}
+    >
+      {checked && <Check className="text-white" size={10} strokeWidth={3} />}
+    </span>
+    <span className="flex-1">{label}</span>
+    <span className="text-[11px] tabular-nums text-neutral-400">{count}</span>
+  </label>
+);
+
+interface FilterGroupProps {
+  label: string;
+  children: React.ReactNode;
 }
+
+const FilterGroup = ({ label, children }: FilterGroupProps) => (
+  <div className="border-b border-neutral-100 py-4 last:border-0">
+    <div className="mb-2 text-[10.5px] font-semibold uppercase tracking-widest text-neutral-400">
+      {label}
+    </div>
+    {children}
+  </div>
+);
 
 const TIMEZONE_OPTIONS = [
   { key: "sea", label: "SEA / APAC (UTC+7 to +10)" },
@@ -76,7 +74,10 @@ const SENIORITY_OPTIONS = [
   { key: "Senior", label: "Senior (5+ yrs)" },
 ] as const;
 
-export function FilterSidebar({ filters, onChange, facets }: FilterSidebarProps) {
+const SALARY_STEP = 100;
+const SALARY_GAP = 500;
+
+export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps) => {
   const { data: categories } = useCategories();
   const activeCount = countActiveFilters(filters);
 
@@ -90,9 +91,15 @@ export function FilterSidebar({ filters, onChange, facets }: FilterSidebarProps)
 
   // Local salary state so dragging the sliders doesn't refetch per step; commit on release.
   const [salary, setSalary] = useState({ min: filters.salaryMin, max: filters.salaryMax });
-  useEffect(() => {
+  const [syncedSalary, setSyncedSalary] = useState({ min: filters.salaryMin, max: filters.salaryMax });
+
+  // Reset local salary state when filters change externally (e.g. "clear filters") —
+  // adjusting state during render, not in an effect, mirroring the search-sync pattern in JobsBoard.
+  if (filters.salaryMin !== syncedSalary.min || filters.salaryMax !== syncedSalary.max) {
+    setSyncedSalary({ min: filters.salaryMin, max: filters.salaryMax });
     setSalary({ min: filters.salaryMin, max: filters.salaryMax });
-  }, [filters.salaryMin, filters.salaryMax]);
+  }
+
   const commitSalary = () => onChange({ ...filters, salaryMin: salary.min, salaryMax: salary.max });
 
   const slugForCategoryName = (name: string) => categories?.find((c) => c.name === name)?.slug;
@@ -155,10 +162,10 @@ export function FilterSidebar({ filters, onChange, facets }: FilterSidebarProps)
             className="w-full accent-brand-600"
             max={SALARY_CEIL}
             min={SALARY_FLOOR}
-            step={100}
+            step={SALARY_STEP}
             type="range"
             value={salary.min}
-            onChange={(e) => setSalary((s) => ({ ...s, min: Math.min(+e.target.value, s.max - 500) }))}
+            onChange={(e) => setSalary((s) => ({ ...s, min: Math.min(+e.target.value, s.max - SALARY_GAP) }))}
             onKeyUp={commitSalary}
             onMouseUp={commitSalary}
             onTouchEnd={commitSalary}
@@ -167,10 +174,10 @@ export function FilterSidebar({ filters, onChange, facets }: FilterSidebarProps)
             className="w-full accent-brand-600"
             max={SALARY_CEIL}
             min={SALARY_FLOOR}
-            step={100}
+            step={SALARY_STEP}
             type="range"
             value={salary.max}
-            onChange={(e) => setSalary((s) => ({ ...s, max: Math.max(+e.target.value, s.min + 500) }))}
+            onChange={(e) => setSalary((s) => ({ ...s, max: Math.max(+e.target.value, s.min + SALARY_GAP) }))}
             onKeyUp={commitSalary}
             onMouseUp={commitSalary}
             onTouchEnd={commitSalary}
@@ -206,4 +213,4 @@ export function FilterSidebar({ filters, onChange, facets }: FilterSidebarProps)
       </FilterGroup>
     </aside>
   );
-}
+};

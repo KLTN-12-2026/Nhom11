@@ -2,7 +2,13 @@ import { Clock, Globe, MapPin } from "lucide-react";
 import { companyColor } from "@/features/jobs/jobs.utils";
 import type { PostJobFormState } from "@/features/post-job/post-job.schemas";
 
-export function PreviewCard({ form }: { form: PostJobFormState }) {
+interface PreviewCardProps {
+  form: PostJobFormState;
+}
+
+const PREVIEW_SKILLS_DISPLAY_COUNT = 4;
+
+export const PreviewCard = ({ form }: PreviewCardProps) => {
   const color = companyColor(form.coName || "Your Company");
 
   return (
@@ -39,14 +45,14 @@ export function PreviewCard({ form }: { form: PostJobFormState }) {
         ))}
       </div>
       <div className="flex flex-wrap gap-1">
-        {form.jobSkills.slice(0, 4).map((s) => (
+        {form.jobSkills.slice(0, PREVIEW_SKILLS_DISPLAY_COUNT).map((s) => (
           <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[10.5px] font-medium text-brand-700" key={s}>
             {s}
           </span>
         ))}
-        {form.jobSkills.length > 4 && (
+        {form.jobSkills.length > PREVIEW_SKILLS_DISPLAY_COUNT && (
           <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-[10.5px] text-neutral-400">
-            +{form.jobSkills.length - 4}
+            +{form.jobSkills.length - PREVIEW_SKILLS_DISPLAY_COUNT}
           </span>
         )}
       </div>
@@ -61,4 +67,4 @@ export function PreviewCard({ form }: { form: PostJobFormState }) {
       </div>
     </div>
   );
-}
+};

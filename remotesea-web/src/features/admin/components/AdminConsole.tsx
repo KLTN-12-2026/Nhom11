@@ -9,7 +9,7 @@ const TABS = [
   { id: "employers", label: "Employers", icon: Building },
 ] as const;
 
-export function AdminConsole() {
+export const AdminConsole = () => {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("queue");
 
   return (
@@ -47,4 +47,4 @@ export function AdminConsole() {
       </div>
     </div>
   );
-}
+};

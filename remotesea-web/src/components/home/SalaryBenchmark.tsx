@@ -4,12 +4,14 @@ import { useSalaryBenchmarks } from "@/features/salary/salary.queries";
 import { BenchBar } from "@/components/home/BenchBar";
 import { ROUTES } from "@/constants/routes";
 
-export function SalaryBenchmark() {
+const MIN_GLOBAL_MAX = 1;
+
+export const SalaryBenchmark = () => {
   const { data: benches } = useSalaryBenchmarks();
   if (!benches || benches.length === 0) return null;
 
   const totalPoints = benches.reduce((a, b) => a + b.count, 0);
-  const globalMax = Math.max(...benches.map((b) => b.max), 1);
+  const globalMax = Math.max(...benches.map((b) => b.max), MIN_GLOBAL_MAX);
 
   return (
     <section className="py-20" style={{ background: "#1A1917" }}>
@@ -68,4 +70,4 @@ export function SalaryBenchmark() {
       </div>
     </section>
   );
-}
+};

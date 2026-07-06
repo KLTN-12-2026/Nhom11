@@ -15,7 +15,11 @@ import type { EmployerApplicant } from "@/types/employer";
 export const EMPLOYER_PROFILE_KEY = ["employer", "profile"];
 export const EMPLOYER_JOBS_KEY = ["employer", "jobs"];
 
-export function useEmployerProfile() {
+const NOT_FOUND_STATUS = 404;
+const FORBIDDEN_STATUS = 403;
+const APPLICATIONS_PER_JOB_LIMIT = 50;
+
+export const useEmployerProfile = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: EMPLOYER_PROFILE_KEY,
@@ -23,15 +27,17 @@ export function useEmployerProfile() {
       try {
         return await getEmployerProfile();
       } catch (err) {
-        if (err instanceof ApiError && (err.status === 404 || err.status === 403)) return null;
+        if (err instanceof ApiError && (err.status === NOT_FOUND_STATUS || err.status === FORBIDDEN_STATUS)) {
+          return null;
+        }
         throw err;
       }
     },
     enabled: !!user && user.role === "EMPLOYER",
   });
-}
+};
 
-export function useCreateEmployerProfile() {
+export const useCreateEmployerProfile = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createEmployerProfile,
@@ -39,9 +45,9 @@ export function useCreateEmployerProfile() {
       queryClient.invalidateQueries({ queryKey: EMPLOYER_PROFILE_KEY });
     },
   });
-}
+};
 
-export function useUpdateEmployerProfile() {
+export const useUpdateEmployerProfile = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: updateEmployerProfile,
@@ -49,16 +55,16 @@ export function useUpdateEmployerProfile() {
       queryClient.setQueryData(EMPLOYER_PROFILE_KEY, profile);
     },
   });
-}
+};
 
-export function useEmployerJobs() {
+export const useEmployerJobs = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: EMPLOYER_JOBS_KEY,
     queryFn: () => listEmployerJobs(),
     enabled: !!user && user.role === "EMPLOYER",
   });
-}
+};
 
 export type ApplicantWithJob = EmployerApplicant & { jobId: string; jobTitle: string };
 
@@ -69,7 +75,7 @@ export type ApplicantWithJob = EmployerApplicant & { jobId: string; jobTitle: st
  * every listing that has at least one application so the dashboard's funnel and
  * recent-applicants panels can be built from real data instead of dropped.
  */
-export function useEmployerApplicationsAggregate() {
+export const useEmployerApplicationsAggregate = () => {
   const { data: jobsData } = useEmployerJobs();
   const jobs = jobsData?.jobs ?? [];
   const jobIds = jobs.filter((j) => j._count.applications > 0).map((j) => j.id);
@@ -77,7 +83,7 @@ export function useEmployerApplicationsAggregate() {
   const results = useQueries({
     queries: jobIds.map((jobId) => ({
       queryKey: ["employer", "job-applications", jobId],
-      queryFn: () => listJobApplications(jobId, { limit: 50 }),
+      queryFn: () => listJobApplications(jobId, { limit: APPLICATIONS_PER_JOB_LIMIT }),
     })),
   });
 
@@ -93,9 +99,9 @@ export function useEmployerApplicationsAggregate() {
   });
 
   return { isLoading, applications: all, byJobId };
-}
+};
 
-export function useUpdateApplicationStatus() {
+export const useUpdateApplicationStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status, notes }: { id: string; status: ApplicationStatus; notes?: string }) =>
@@ -105,4 +111,4 @@ export function useUpdateApplicationStatus() {
       queryClient.invalidateQueries({ queryKey: EMPLOYER_JOBS_KEY });
     },
   });
-}
+};

@@ -3,28 +3,31 @@ import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUpdateMyName } from "@/features/users/users.queries";
 
-type FormValues = { name: string };
+interface AccountNameFormValues {
+  name: string;
+}
 
-export function AccountNameForm() {
+export const AccountNameForm = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const updateName = useUpdateMyName();
+  const updateNameMutation = useUpdateMyName();
 
   const {
     register,
     handleSubmit,
     formState: { isSubmitting, isDirty },
-  } = useForm<FormValues>({ defaultValues: { name: user?.name ?? "" } });
+  } = useForm<AccountNameFormValues>({ defaultValues: { name: user?.name ?? "" } });
 
-  async function onSubmit(values: FormValues) {
-    if (!values.name.trim()) return;
+  const onSubmit = async (values: AccountNameFormValues) => {
+    const trimmedName = values.name.trim();
+    if (!trimmedName) return;
     try {
-      await updateName.mutateAsync(values.name.trim());
+      await updateNameMutation.mutateAsync(trimmedName);
       toast({ variant: "success", title: "Name updated" });
     } catch {
       toast({ variant: "error", title: "Couldn't update name", description: "Please try again." });
     }
-  }
+  };
 
   return (
     <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
@@ -58,4 +61,4 @@ export function AccountNameForm() {
       </div>
     </form>
   );
-}
+};

@@ -28,8 +28,10 @@ const ITEMS = [
   },
 ];
 
-export function FAQSection() {
-  const [open, setOpen] = useState<number>(0);
+const NO_ITEM_OPEN = -1;
+
+export const FAQSection = () => {
+  const [openIndex, setOpenIndex] = useState<number>(0);
 
   return (
     <section className="py-16">
@@ -46,22 +48,22 @@ export function FAQSection() {
           {ITEMS.map((item, i) => (
             <div
               className={`rounded-12 border bg-white transition-colors ${
-                open === i ? "border-neutral-200" : "border-neutral-100"
+                openIndex === i ? "border-neutral-200" : "border-neutral-100"
               }`}
               key={item.q}
             >
               <button
                 className="flex w-full items-center justify-between gap-4 px-6 py-[18px] text-left"
-                onClick={() => setOpen(open === i ? -1 : i)}
+                onClick={() => setOpenIndex(openIndex === i ? NO_ITEM_OPEN : i)}
               >
                 <span className="text-[15px] font-medium tracking-tight text-neutral-900">{item.q}</span>
-                {open === i ? (
+                {openIndex === i ? (
                   <Minus className="flex-shrink-0 text-neutral-400" size={16} />
                 ) : (
                   <Plus className="flex-shrink-0 text-neutral-400" size={16} />
                 )}
               </button>
-              {open === i && (
+              {openIndex === i && (
                 <div className="px-6 pb-5 text-[14.5px] leading-relaxed text-neutral-500">{item.a}</div>
               )}
             </div>
@@ -70,4 +72,4 @@ export function FAQSection() {
       </div>
     </section>
   );
-}
+};

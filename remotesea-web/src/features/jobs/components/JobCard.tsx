@@ -1,14 +1,11 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Bookmark, Clock, RefreshCw, ShieldCheck, Star } from "lucide-react";
 import { CompanyLogo } from "@/components/ui/company-logo";
 import { Badge } from "@/components/ui/badge";
 import { SalaryBadge } from "@/components/ui/salary-badge";
 import { Tag } from "@/components/ui/tag";
 import { cn } from "@/utils/cn";
-import { useToast } from "@/components/ui/toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { useSavedJobs, useToggleSavedJob } from "@/features/saved/saved.queries";
+import { useSavedJobToggle } from "@/features/jobs/useSavedJobToggle";
 import {
   JOB_TYPE_LABELS,
   LEVEL_LABELS,
@@ -20,41 +17,17 @@ import {
 import { ROUTES } from "@/constants/routes";
 import type { Job } from "@/types/job";
 
-export function JobCard({ job }: { job: Job }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const { data: savedJobs, isLoading: savedStatusLoading } = useSavedJobs();
-  const toggleSaved = useToggleSavedJob();
-  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
+interface JobCardProps {
+  job: Job;
+}
 
-  // Avoid flashing "unsaved" before the saved-jobs query resolves for a signed-in
-  // user — the original computed this server-side before first paint.
-  const statusUnknown = !!user && savedStatusLoading;
-  const savedFromServer = savedJobs?.some((s) => s.jobId === job.id) ?? false;
-  const saved = optimisticSaved ?? savedFromServer;
+export const JobCard = ({ job }: JobCardProps) => {
+  const { saved, statusUnknown, toggle } = useSavedJobToggle(job.id, ROUTES.jobs);
 
   const country = job.country ?? "Remote";
   const timezone = job.timezone ?? (job.isRemote ? "Remote" : country);
   const isAsync = isAsyncTimezone(timezone);
   const category = job.categories[0]?.category.name ?? "Other";
-
-  async function handleToggleSave(e: React.MouseEvent) {
-    e.preventDefault();
-    if (!user) {
-      navigate(`${ROUTES.login}?callbackUrl=${encodeURIComponent(ROUTES.jobs)}`);
-      return;
-    }
-    const prev = saved;
-    setOptimisticSaved(!prev);
-    try {
-      await toggleSaved.mutateAsync(job.id);
-      toast({ variant: "success", title: prev ? "Removed from saved" : "Saved to your list" });
-    } catch {
-      setOptimisticSaved(prev);
-      toast({ variant: "error", title: "Couldn't update saved jobs" });
-    }
-  }
 
   return (
     <Link
@@ -126,11 +99,11 @@ export function JobCard({ job }: { job: Job }) {
                 : "text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
           )}
           disabled={statusUnknown}
-          onClick={handleToggleSave}
+          onClick={toggle}
         >
           <Bookmark fill={saved ? "currentColor" : "none"} size={15} />
         </button>
       </div>
     </Link>
   );
-}
+};

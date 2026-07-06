@@ -8,7 +8,7 @@ import { LEVEL_TO_LABEL } from "@/features/talent/talent.schemas";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-export function PublicTalentProfilePage() {
+export const PublicTalentProfilePage = () => {
   const { slug } = useParams<{ slug: string }>();
   const { user } = useAuth();
   const { data: profile, isLoading, isError } = usePublicTalentProfile(slug);
@@ -182,4 +182,4 @@ export function PublicTalentProfilePage() {
       </div>
     </div>
   );
-}
+};

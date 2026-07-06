@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Briefcase, Building, Flag, Search, Shield, Wallet } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
+import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
 
@@ -9,30 +10,21 @@ const FILTERS = [
   { id: "unverified", label: "Unverified" },
 ] as const;
 
-function CompanyInitial({ name, color, size = 38 }: { name: string; color: string; size?: number }) {
-  return (
-    <div
-      aria-label={name}
-      className="grid flex-shrink-0 place-items-center rounded-10 font-semibold text-white"
-      style={{ background: color, width: size, height: size, fontSize: size * 0.38 }}
-    >
-      {name[0]?.toUpperCase()}
-    </div>
-  );
-}
+const CENTS_PER_DOLLAR = 100;
+const DOLLARS_PER_THOUSAND = 1000;
 
-export function AdminEmployers() {
+export const AdminEmployers = () => {
   const { toast } = useToast();
   const { data, isLoading } = useAdminEmployers();
-  const updateEmployer = useUpdateAdminEmployer();
+  const updateEmployerMutation = useUpdateAdminEmployer();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
   const [search, setSearch] = useState("");
 
   const employers = data?.employers ?? [];
 
-  async function act(id: string, action: "verify" | "suspend") {
+  const updateEmployerStatus = async (id: string, action: "verify" | "suspend") => {
     try {
-      await updateEmployer.mutateAsync({ id, action });
+      await updateEmployerMutation.mutateAsync({ id, action });
       toast({
         variant: action === "verify" ? "success" : "info",
         title: action === "verify" ? "Employer verified" : "Employer suspended",
@@ -40,7 +32,7 @@ export function AdminEmployers() {
     } catch {
       toast({ variant: "error", title: "Couldn't update employer" });
     }
-  }
+  };
 
   const rows = employers.filter((e) => {
     if (filter === "unverified" && e.isVerified) return false;
@@ -61,7 +53,8 @@ export function AdminEmployers() {
         <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Operations</p>
         <h1 className="text-[26px] font-semibold text-neutral-900">Employers</h1>
         <p className="mt-1 text-sm text-neutral-500">
-          {employers.length} companies · {totalListings} total listings · ${(totalSpendCents / 100).toLocaleString()} billed
+          {employers.length} companies · {totalListings} total listings · $
+          {(totalSpendCents / CENTS_PER_DOLLAR).toLocaleString()} billed
         </p>
       </div>
 
@@ -70,7 +63,12 @@ export function AdminEmployers() {
         {[
           { icon: <Building size={14} />, label: "Total employers", val: employers.length, sub: "all time" },
           { icon: <Shield size={14} />, label: "Unverified", val: counts.unverified, sub: "need review", warn: counts.unverified > 0 },
-          { icon: <Wallet size={14} />, label: "Total billed", val: `$${(totalSpendCents / 100 / 1000).toFixed(1)}k`, sub: "lifetime" },
+          {
+            icon: <Wallet size={14} />,
+            label: "Total billed",
+            val: `$${(totalSpendCents / CENTS_PER_DOLLAR / DOLLARS_PER_THOUSAND).toFixed(1)}k`,
+            sub: "lifetime",
+          },
         ].map((s) => (
           <div className="rounded-12 border border-neutral-100 bg-white p-4" key={s.label}>
             <div className="mb-2 flex items-center gap-1.5 text-[12px] text-neutral-400">
@@ -152,7 +150,7 @@ export function AdminEmployers() {
               </div>
               <div>
                 <div className="mb-1 font-mono text-[13px] font-semibold text-neutral-900">
-                  ${(e.totalSpend / 100).toLocaleString()}
+                  ${(e.totalSpend / CENTS_PER_DOLLAR).toLocaleString()}
                 </div>
                 <div className="h-1 overflow-hidden rounded-full bg-neutral-100">
                   <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }} />
@@ -164,18 +162,18 @@ export function AdminEmployers() {
               {e.isVerified ? (
                 <button
                   className="rounded-6 border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
-                  disabled={updateEmployer.isPending}
+                  disabled={updateEmployerMutation.isPending}
                   type="button"
-                  onClick={() => act(e.id, "suspend")}
+                  onClick={() => updateEmployerStatus(e.id, "suspend")}
                 >
                   Suspend
                 </button>
               ) : (
                 <button
                   className="rounded-6 border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-60"
-                  disabled={updateEmployer.isPending}
+                  disabled={updateEmployerMutation.isPending}
                   type="button"
-                  onClick={() => act(e.id, "verify")}
+                  onClick={() => updateEmployerStatus(e.id, "verify")}
                 >
                   Verify
                 </button>
@@ -186,4 +184,4 @@ export function AdminEmployers() {
       </div>
     </div>
   );
-}
+};

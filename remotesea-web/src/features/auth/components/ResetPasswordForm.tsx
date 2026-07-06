@@ -4,12 +4,14 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { resetPasswordSchema, type ResetPasswordFormValues } from "@/features/auth/auth.schemas";
 import { resetPassword } from "@/features/auth/auth.api";
+import { TextField } from "@/components/shared/TextField";
 import { useToast } from "@/components/ui/toast";
-import { ApiError } from "@/services/api-error";
-import { applyServerErrors } from "@/utils/form-errors";
+import { applyFormSubmitError } from "@/utils/form-errors";
 import { ROUTES } from "@/constants/routes";
 
-export function ResetPasswordForm() {
+const MISSING_TOKEN_MESSAGE = "This reset link is missing its token. Request a new one.";
+
+export const ResetPasswordForm = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -26,25 +28,24 @@ export function ResetPasswordForm() {
     defaultValues: { password: "", confirmPassword: "" },
   });
 
-  async function onSubmit(values: ResetPasswordFormValues) {
+  const onSubmit = async (values: ResetPasswordFormValues) => {
     if (!token) {
-      setFormError("This reset link is missing its token. Request a new one.");
+      setFormError(MISSING_TOKEN_MESSAGE);
       return;
     }
     setFormError(null);
     try {
       await resetPassword({ token, password: values.password });
-      toast({ title: "Password updated", description: "Sign in with your new password.", variant: "success" });
+      toast({
+        title: "Password updated",
+        description: "Sign in with your new password.",
+        variant: "success",
+      });
       navigate(ROUTES.login, { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) {
-        applyServerErrors(err, setError);
-        setFormError(err.message);
-      } else {
-        setFormError("Something went wrong. Please try again.");
-      }
+      setFormError(applyFormSubmitError(err, setError, "Something went wrong. Please try again."));
     }
-  }
+  };
 
   if (!token) {
     return (
@@ -56,35 +57,23 @@ export function ResetPasswordForm() {
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-neutral-700" htmlFor="password">
-          New password
-        </label>
-        <input
-          className="h-11 w-full rounded-12 border border-neutral-200 bg-white px-4 text-sm outline-none transition-all placeholder:text-neutral-400 focus:border-brand-600 focus:shadow-focus"
-          id="password"
-          placeholder="At least 8 characters"
-          type="password"
-          {...register("password")}
-        />
-        {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password.message}</p>}
-      </div>
+      <TextField
+        error={errors.password?.message}
+        id="password"
+        label="New password"
+        placeholder="At least 8 characters"
+        registration={register("password")}
+        type="password"
+      />
 
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-neutral-700" htmlFor="confirmPassword">
-          Confirm new password
-        </label>
-        <input
-          className="h-11 w-full rounded-12 border border-neutral-200 bg-white px-4 text-sm outline-none transition-all placeholder:text-neutral-400 focus:border-brand-600 focus:shadow-focus"
-          id="confirmPassword"
-          placeholder="Repeat your password"
-          type="password"
-          {...register("confirmPassword")}
-        />
-        {errors.confirmPassword && (
-          <p className="mt-1 text-xs text-red-600">{errors.confirmPassword.message}</p>
-        )}
-      </div>
+      <TextField
+        error={errors.confirmPassword?.message}
+        id="confirmPassword"
+        label="Confirm new password"
+        placeholder="Repeat your password"
+        registration={register("confirmPassword")}
+        type="password"
+      />
 
       {formError && <p className="text-sm text-red-600">{formError}</p>}
 
@@ -97,4 +86,4 @@ export function ResetPasswordForm() {
       </button>
     </form>
   );
-}
+};

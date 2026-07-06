@@ -3,24 +3,29 @@ import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ToastProvider } from "@/components/ui/toast";
 
+interface AppProvidersProps {
+  children: React.ReactNode;
+}
+
+const QUERY_STALE_TIME_MS = 60_000;
+const QUERY_RETRY_COUNT = 1;
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,
-      retry: 1,
+      staleTime: QUERY_STALE_TIME_MS,
+      retry: QUERY_RETRY_COUNT,
       refetchOnWindowFocus: false,
     },
   },
 });
 
-export function AppProviders({ children }: { children: React.ReactNode }) {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <ToastProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ToastProvider>
-      </BrowserRouter>
-    </QueryClientProvider>
-  );
-}
+export const AppProviders = ({ children }: AppProvidersProps) => (
+  <QueryClientProvider client={queryClient}>
+    <BrowserRouter>
+      <ToastProvider>
+        <AuthProvider>{children}</AuthProvider>
+      </ToastProvider>
+    </BrowserRouter>
+  </QueryClientProvider>
+);

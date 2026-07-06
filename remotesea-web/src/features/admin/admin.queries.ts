@@ -11,25 +11,27 @@ import type { JobStatus } from "@/types/job";
 export const ADMIN_JOBS_KEY = ["admin", "jobs"];
 export const ADMIN_EMPLOYERS_KEY = ["admin", "employers"];
 
-export function useAdminJobs(status: JobStatus = "PENDING_REVIEW") {
+const ADMIN_LIST_LIMIT = 50;
+
+export const useAdminJobs = (status: JobStatus = "PENDING_REVIEW") => {
   const { user } = useAuth();
   return useQuery({
     queryKey: [...ADMIN_JOBS_KEY, status],
-    queryFn: () => listAdminJobs({ status, limit: 50 }),
+    queryFn: () => listAdminJobs({ status, limit: ADMIN_LIST_LIMIT }),
     enabled: !!user && user.role === "ADMIN",
   });
-}
+};
 
-export function useAdminEmployers() {
+export const useAdminEmployers = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: ADMIN_EMPLOYERS_KEY,
-    queryFn: () => listAdminEmployers({ limit: 50 }),
+    queryFn: () => listAdminEmployers({ limit: ADMIN_LIST_LIMIT }),
     enabled: !!user && user.role === "ADMIN",
   });
-}
+};
 
-export function useReviewAdminJob() {
+export const useReviewAdminJob = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, action, note }: { id: string; action: "approve" | "reject"; note?: string }) =>
@@ -38,9 +40,9 @@ export function useReviewAdminJob() {
       queryClient.invalidateQueries({ queryKey: ADMIN_JOBS_KEY });
     },
   });
-}
+};
 
-export function useUpdateAdminEmployer() {
+export const useUpdateAdminEmployer = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, action }: { id: string; action: "verify" | "suspend" }) =>
@@ -49,4 +51,4 @@ export function useUpdateAdminEmployer() {
       queryClient.invalidateQueries({ queryKey: ADMIN_EMPLOYERS_KEY });
     },
   });
-}
+};

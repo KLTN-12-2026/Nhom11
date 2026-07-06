@@ -4,16 +4,16 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const MY_APPLICATIONS_KEY = ["my-applications"];
 
-export function useMyApplications() {
+export const useMyApplications = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: MY_APPLICATIONS_KEY,
     queryFn: listMyApplications,
     enabled: !!user,
   });
-}
+};
 
-export function useApplyToJob() {
+export const useApplyToJob = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: applyToJob,
@@ -21,4 +21,4 @@ export function useApplyToJob() {
       queryClient.invalidateQueries({ queryKey: MY_APPLICATIONS_KEY });
     },
   });
-}
+};

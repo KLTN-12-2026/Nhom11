@@ -38,7 +38,7 @@ const FOOTER_COLS = [
   },
 ];
 
-export function Footer() {
+export const Footer = () => {
   return (
     <footer className="mt-20 border-t border-neutral-100 bg-white">
       <div className="mx-auto max-w-[1240px] px-6 py-12">
@@ -94,4 +94,4 @@ export function Footer() {
       </div>
     </footer>
   );
-}
+};

@@ -3,14 +3,14 @@ import { JobsBoard } from "@/features/jobs/components/JobsBoard";
 import { parseJobQuery, serializeJobQuery, type JobFilters } from "@/features/jobs/job-filters";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
-export function JobsPage() {
+export const JobsPage = () => {
   useDocumentTitle("Browse Remote Jobs");
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = parseJobQuery(searchParams);
 
-  function handleFiltersChange(next: JobFilters) {
+  const handleFiltersChange = (next: JobFilters) => {
     setSearchParams(serializeJobQuery(next));
-  }
+  };
 
   return <JobsBoard filters={filters} onFiltersChange={handleFiltersChange} />;
-}
+};

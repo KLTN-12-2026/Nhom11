@@ -9,16 +9,18 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const ALERTS_KEY = ["alerts"];
 
-export function useAlerts() {
+type SetAlertActivePayload = { id: string; isActive: boolean };
+
+export const useAlerts = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: ALERTS_KEY,
     queryFn: listAlerts,
     enabled: !!user,
   });
-}
+};
 
-export function useCreateAlert() {
+export const useCreateAlert = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: createAlert,
@@ -26,19 +28,19 @@ export function useCreateAlert() {
       queryClient.invalidateQueries({ queryKey: ALERTS_KEY });
     },
   });
-}
+};
 
-export function useSetAlertActive() {
+export const useSetAlertActive = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) => setAlertActive(id, isActive),
+    mutationFn: ({ id, isActive }: SetAlertActivePayload) => setAlertActive(id, isActive),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ALERTS_KEY });
     },
   });
-}
+};
 
-export function useDeleteAlert() {
+export const useDeleteAlert = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteAlert,
@@ -46,4 +48,4 @@ export function useDeleteAlert() {
       queryClient.invalidateQueries({ queryKey: ALERTS_KEY });
     },
   });
-}
+};

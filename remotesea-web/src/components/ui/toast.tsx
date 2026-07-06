@@ -10,6 +10,12 @@ type ToastInput = { title: string; description?: string; variant?: Variant };
 
 type ToastContextValue = { toast: (input: ToastInput) => void };
 
+interface ToastProviderProps {
+  children: React.ReactNode;
+}
+
+const TOAST_DURATION_MS = 4000;
+
 const ToastContext = createContext<ToastContextValue | null>(null);
 
 const ICONS = {
@@ -24,7 +30,7 @@ const ACCENT = {
   info: "text-neutral-500",
 } as const;
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
+export const ToastProvider = ({ children }: ToastProviderProps) => {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const remove = useCallback((id: number) => {
@@ -35,7 +41,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     ({ title, description, variant = "info" }: ToastInput) => {
       const id = Date.now() + Math.random();
       setToasts((prev) => [...prev, { id, title, description, variant }]);
-      setTimeout(() => remove(id), 4000);
+      setTimeout(() => remove(id), TOAST_DURATION_MS);
     },
     [remove]
   );
@@ -74,10 +80,10 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       </div>
     </ToastContext.Provider>
   );
-}
+};
 
-export function useToast(): ToastContextValue {
+export const useToast = (): ToastContextValue => {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error("useToast must be used within ToastProvider");
   return ctx;
-}
+};

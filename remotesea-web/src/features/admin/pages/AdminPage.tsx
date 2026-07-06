@@ -1,7 +1,7 @@
 import { AdminConsole } from "@/features/admin/components/AdminConsole";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
-export function AdminPage() {
+export const AdminPage = () => {
   useDocumentTitle("Ops Console");
   return <AdminConsole />;
-}
+};

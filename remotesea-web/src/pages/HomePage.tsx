@@ -77,7 +77,7 @@ const TESTIMONIALS = [
   },
 ];
 
-export function HomePage() {
+export const HomePage = () => {
   useDocumentTitle("Remote Jobs from SG, AU & beyond");
   const { data } = useJobsQuery(DEFAULT_JOB_FILTERS, 4);
   const featuredJobs = data?.jobs ?? [];
@@ -474,4 +474,4 @@ export function HomePage() {
       </section>
     </>
   );
-}
+};

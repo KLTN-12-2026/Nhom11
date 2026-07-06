@@ -4,11 +4,11 @@ import { FullPageLoader } from "@/components/ui/spinner";
 import { ROUTES } from "@/constants/routes";
 import type { UserRole } from "@/types/user";
 
-type ProtectedRouteProps = {
+interface ProtectedRouteProps {
   roles?: UserRole[];
-};
+}
 
-export function ProtectedRoute({ roles }: ProtectedRouteProps) {
+export const ProtectedRoute = ({ roles }: ProtectedRouteProps) => {
   const { user, status } = useAuth();
   const location = useLocation();
 
@@ -24,4 +24,4 @@ export function ProtectedRoute({ roles }: ProtectedRouteProps) {
   }
 
   return <Outlet />;
-}
+};

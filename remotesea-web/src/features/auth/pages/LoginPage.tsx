@@ -21,7 +21,7 @@ const PREVIEW_JOBS = [
   },
 ];
 
-export function LoginPage() {
+export const LoginPage = () => {
   useDocumentTitle("Sign In");
 
   return (
@@ -125,4 +125,4 @@ export function LoginPage() {
       </div>
     </div>
   );
-}
+};

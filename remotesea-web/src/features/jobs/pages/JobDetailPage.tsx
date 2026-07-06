@@ -13,6 +13,7 @@ import { useSalaryBenchmarks } from "@/features/salary/salary.queries";
 import {
   JOB_TYPE_LABELS,
   LEVEL_LABELS,
+  MS_PER_DAY,
   companyColor,
   countryFlag,
   timeAgo,
@@ -20,13 +21,13 @@ import {
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-function daysUntil(dateString: string | null): number | null {
+const daysUntil = (dateString: string | null): number | null => {
   if (!dateString) return null;
   const diff = new Date(dateString).getTime() - Date.now();
-  return Math.max(0, Math.ceil(diff / 86_400_000));
-}
+  return Math.max(0, Math.ceil(diff / MS_PER_DAY));
+};
 
-export function JobDetailPage() {
+export const JobDetailPage = () => {
   const { id } = useParams<{ id: string }>();
   const { data: job, isLoading, isError } = useJobQuery(id);
   const { data: benchmarks } = useSalaryBenchmarks();
@@ -313,4 +314,4 @@ export function JobDetailPage() {
       </div>
     </div>
   );
-}
+};

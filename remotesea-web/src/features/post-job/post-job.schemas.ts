@@ -11,10 +11,10 @@ export const HQ_OPTIONS = [
   "Other",
 ] as const;
 
-export function hqToCountry(hq: string): string | undefined {
+export const hqToCountry = (hq: string): string | undefined => {
   const stripped = hq.replace(/[^a-zA-Z ]/g, "").trim();
   return stripped || undefined;
-}
+};
 
 export const SENIORITY_OPTIONS = ["Intern", "Junior", "Mid", "Senior", "Staff", "Lead", "Head"] as const;
 
@@ -153,6 +153,11 @@ export type PostJobFormState = {
   benefits: string[];
   tier: string;
 };
+
+export interface PostJobStepProps {
+  form: PostJobFormState;
+  set: (key: keyof PostJobFormState, value: unknown) => void;
+}
 
 export const INITIAL_FORM_STATE: PostJobFormState = {
   coName: "",

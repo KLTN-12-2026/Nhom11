@@ -23,13 +23,11 @@ apiClient.interceptors.request.use((config) => {
 
 let onUnauthorized: (() => void) | null = null;
 
-export function registerUnauthorizedHandler(handler: () => void): void {
+export const registerUnauthorizedHandler = (handler: () => void): void => {
   onUnauthorized = handler;
-}
+};
 
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 apiClient.interceptors.response.use(
   (response) => response,

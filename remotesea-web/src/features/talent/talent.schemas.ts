@@ -11,17 +11,15 @@ const BUCKET_TO_YEARS: Record<YearsBucket, number> = {
   "10+": 12,
 };
 
-export function bucketToYears(bucket: YearsBucket): number {
-  return BUCKET_TO_YEARS[bucket];
-}
+export const bucketToYears = (bucket: YearsBucket): number => BUCKET_TO_YEARS[bucket];
 
-export function yearsToBucket(years: number | null): YearsBucket {
+export const yearsToBucket = (years: number | null): YearsBucket => {
   if (years === null) return "0–2";
   if (years <= 2) return "0–2";
   if (years <= 5) return "2–5";
   if (years <= 10) return "5–10";
   return "10+";
-}
+};
 
 export const SENIORITY_OPTIONS = ["Junior", "Mid", "Senior", "Staff", "Principal / Lead"] as const;
 
@@ -48,11 +46,11 @@ export const TIMEZONE_OPTIONS = [
   "UTC+10 (Sydney · Melbourne)",
 ] as const;
 
-function normalizeUrl(value: string): string | undefined {
-  const v = value.trim();
-  if (!v) return undefined;
-  return /^https?:\/\//i.test(v) ? v : `https://${v}`;
-}
+export const normalizeUrl = (value: string): string | undefined => {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
 
 export const profileFormSchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
@@ -71,5 +69,3 @@ export const profileFormSchema = z.object({
   portfolioUrl: z.string().optional(),
 });
 export type ProfileFormValues = z.infer<typeof profileFormSchema>;
-
-export { normalizeUrl };

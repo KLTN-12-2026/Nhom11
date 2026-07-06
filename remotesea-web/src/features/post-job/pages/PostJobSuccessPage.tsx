@@ -8,7 +8,7 @@ import { ROUTES } from "@/constants/routes";
 // would require the Stripe secret key, which must never run in the browser, and
 // the backend has no endpoint to check a session by id — the webhook is the real
 // source of truth for marking the job paid, so this is a generic confirmation.
-export function PostJobSuccessPage() {
+export const PostJobSuccessPage = () => {
   useDocumentTitle("Payment received");
 
   return (
@@ -25,4 +25,4 @@ export function PostJobSuccessPage() {
       </Link>
     </div>
   );
-}
+};

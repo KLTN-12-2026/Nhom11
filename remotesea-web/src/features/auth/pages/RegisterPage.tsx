@@ -4,7 +4,7 @@ import { RegisterForm } from "@/features/auth/components/RegisterForm";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-export function RegisterPage() {
+export const RegisterPage = () => {
   useDocumentTitle("Create Account");
 
   return (
@@ -96,4 +96,4 @@ export function RegisterPage() {
       </div>
     </div>
   );
-}
+};

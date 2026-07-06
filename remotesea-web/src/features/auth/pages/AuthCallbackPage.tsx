@@ -9,7 +9,7 @@ import { ROUTES } from "@/constants/routes";
  * Landing target for the backend's OAuth redirect:
  * `<FRONTEND_URL>/auth/callback?token=<accessToken>` (see remotesea-api docs/API.md, GET /auth/google|github).
  */
-export function AuthCallbackPage() {
+export const AuthCallbackPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { loginWithToken } = useAuth();
@@ -38,4 +38,4 @@ export function AuthCallbackPage() {
   }, [searchParams, loginWithToken, navigate, toast]);
 
   return <FullPageLoader />;
-}
+};

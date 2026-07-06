@@ -3,7 +3,17 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Check } from "lucide-react";
 import { ROUTES } from "@/constants/routes";
 
-const TIERS = [
+interface PricingTier {
+  name: string;
+  tag: string;
+  price: number;
+  annualPrice: number | null;
+  desc: string;
+  featured: boolean;
+  features: string[];
+}
+
+const TIERS: PricingTier[] = [
   {
     name: "Standard",
     tag: "For one-off roles",
@@ -38,7 +48,7 @@ const TIERS = [
     name: "Hands-on",
     tag: "We do the work",
     price: 1200,
-    annualPrice: null as number | null,
+    annualPrice: null,
     desc: "We screen the applicants. You see the top 5.",
     featured: false,
     features: [
@@ -51,7 +61,32 @@ const TIERS = [
   },
 ];
 
-export function PricingSection() {
+interface TierPriceProps {
+  tier: PricingTier;
+  annual: boolean;
+}
+
+const TierPrice = ({ tier, annual }: TierPriceProps) => {
+  if (annual && tier.annualPrice) {
+    return (
+      <>
+        ${tier.annualPrice.toLocaleString()}
+        <span className="ml-1 font-sans text-[16px] text-neutral-400">/yr</span>
+      </>
+    );
+  }
+  if (annual && !tier.annualPrice) {
+    return <span className="text-[32px] italic">Quote</span>;
+  }
+  return (
+    <>
+      ${tier.price.toLocaleString()}
+      <span className="ml-1 font-sans text-[16px] text-neutral-400">/post</span>
+    </>
+  );
+};
+
+export const PricingSection = () => {
   const [annual, setAnnual] = useState(false);
 
   return (
@@ -116,19 +151,7 @@ export function PricingSection() {
               <div className="mb-4 text-[12.5px] text-neutral-400">{tier.tag}</div>
 
               <div className="mb-3 font-serif text-[48px] leading-none tracking-tight text-neutral-900" style={{ fontFamily: "var(--font-serif)" }}>
-                {annual && tier.annualPrice ? (
-                  <>
-                    ${tier.annualPrice.toLocaleString()}
-                    <span className="ml-1 font-sans text-[16px] text-neutral-400">/yr</span>
-                  </>
-                ) : annual && !tier.annualPrice ? (
-                  <span className="text-[32px] italic">Quote</span>
-                ) : (
-                  <>
-                    ${tier.price.toLocaleString()}
-                    <span className="ml-1 font-sans text-[16px] text-neutral-400">/post</span>
-                  </>
-                )}
+                <TierPrice annual={annual} tier={tier} />
               </div>
 
               <p className="mb-5 min-h-[42px] text-[13.5px] leading-relaxed text-neutral-500">{tier.desc}</p>
@@ -176,4 +199,4 @@ export function PricingSection() {
       </div>
     </section>
   );
-}
+};

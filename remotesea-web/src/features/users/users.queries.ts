@@ -2,7 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { changeMyPassword, deleteMyAccount, updateMyName } from "@/features/users/users.api";
 import { useAuth } from "@/contexts/AuthContext";
 
-export function useUpdateMyName() {
+export const useUpdateMyName = () => {
   const { patchUser } = useAuth();
   return useMutation({
     mutationFn: updateMyName,
@@ -10,13 +10,11 @@ export function useUpdateMyName() {
       patchUser({ name: result.name });
     },
   });
-}
+};
 
-export function useChangeMyPassword() {
-  return useMutation({ mutationFn: changeMyPassword });
-}
+export const useChangeMyPassword = () => useMutation({ mutationFn: changeMyPassword });
 
-export function useDeleteMyAccount() {
+export const useDeleteMyAccount = () => {
   const { logout } = useAuth();
   return useMutation({
     mutationFn: deleteMyAccount,
@@ -24,4 +22,4 @@ export function useDeleteMyAccount() {
       logout();
     },
   });
-}
+};

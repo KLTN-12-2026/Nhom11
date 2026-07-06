@@ -37,27 +37,29 @@ const COMPANY_COLORS = [
   "#B45309",
 ];
 
-export function companyColor(name: string): string {
+export const companyColor = (name: string): string => {
   let hash = 0;
   for (let i = 0; i < name.length; i += 1) hash += name.charCodeAt(i);
   return COMPANY_COLORS[hash % COMPANY_COLORS.length];
-}
+};
 
-export function countryFlag(country: string | null): string {
+export const countryFlag = (country: string | null): string => {
   if (!country) return "🌏";
   return COUNTRY_FLAGS[country] ?? "🌏";
-}
+};
 
-export function isAsyncTimezone(timezone: string | null): boolean {
-  return timezone?.toLowerCase().includes("async") ?? false;
-}
+export const isAsyncTimezone = (timezone: string | null): boolean =>
+  timezone?.toLowerCase().includes("async") ?? false;
 
-export function timeAgo(dateString: string | null): string {
+export const MS_PER_DAY = 86_400_000;
+const MS_PER_HOUR = 3_600_000;
+
+export const timeAgo = (dateString: string | null): string => {
   if (!dateString) return "just now";
   const diff = Date.now() - new Date(dateString).getTime();
-  const days = Math.floor(diff / 86_400_000);
+  const days = Math.floor(diff / MS_PER_DAY);
   if (days >= 1) return `${days}d`;
-  const hours = Math.floor(diff / 3_600_000);
+  const hours = Math.floor(diff / MS_PER_HOUR);
   if (hours >= 1) return `${hours}h`;
   return "just now";
-}
+};

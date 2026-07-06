@@ -16,10 +16,10 @@ import {
   type SortKey,
 } from "@/features/jobs/job-filters";
 
-type JobsBoardProps = {
+interface JobsBoardProps {
   filters: JobFilters;
   onFiltersChange: (filters: JobFilters) => void;
-};
+}
 
 const TIMEZONE_LABELS: Record<string, string> = {
   sea: "SEA / APAC",
@@ -29,7 +29,10 @@ const TIMEZONE_LABELS: Record<string, string> = {
   US: "US-based",
 };
 
-export function JobsBoard({ filters: query, onFiltersChange }: JobsBoardProps) {
+const SEARCH_DEBOUNCE_MS = 400;
+const JOB_LIST_SKELETON_COUNT = 6;
+
+export const JobsBoard = ({ filters: query, onFiltersChange }: JobsBoardProps) => {
   const [search, setSearch] = useState(query.q);
   const [syncedQ, setSyncedQ] = useState(query.q);
   const firstRender = useRef(true);
@@ -51,7 +54,7 @@ export function JobsBoard({ filters: query, onFiltersChange }: JobsBoardProps) {
     }
     const t = setTimeout(() => {
       if (search !== query.q) onFiltersChange({ ...query, q: search, page: 1 });
-    }, 400);
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search]);
@@ -152,7 +155,7 @@ export function JobsBoard({ filters: query, onFiltersChange }: JobsBoardProps) {
           {/* Job list */}
           {isLoading ? (
             <div className="space-y-2">
-              {Array.from({ length: 6 }, (_, i) => (
+              {Array.from({ length: JOB_LIST_SKELETON_COUNT }, (_, i) => (
                 <JobCardSkeleton key={i} />
               ))}
             </div>
@@ -220,4 +223,4 @@ export function JobsBoard({ filters: query, onFiltersChange }: JobsBoardProps) {
       </div>
     </div>
   );
-}
+};

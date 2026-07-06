@@ -12,7 +12,7 @@ import { ROUTES } from "@/constants/routes";
  * (mid-submit, before that explicit navigate runs) would race it and can bounce to
  * the wrong destination.
  */
-export function GuestOnlyRoute() {
+export const GuestOnlyRoute = () => {
   const { user, status } = useAuth();
   const [decided, setDecided] = useState<boolean | null>(() => (status === "loading" ? null : !!user));
   const [lastStatus, setLastStatus] = useState(status);
@@ -30,4 +30,4 @@ export function GuestOnlyRoute() {
   if (decided) return <Navigate replace to={ROUTES.home} />;
 
   return <Outlet />;
-}
+};

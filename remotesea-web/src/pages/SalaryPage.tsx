@@ -196,40 +196,34 @@ const ROLES = [
 ];
 const SENIORITIES = ["All", "Junior", "Mid", "Senior", "Staff"];
 
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
+interface ChipProps {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
-}) {
-  return (
-    <button
-      className={cn(
-        "rounded-8 border px-3 py-1.5 text-[12.5px] font-medium transition-all",
-        active
-          ? "border-brand-600 bg-brand-50 text-brand-700"
-          : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50"
-      )}
-      type="button"
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  );
 }
 
-function SalaryBar({
-  row,
-  globalMax,
-  fmt,
-}: {
+const Chip = ({ active, onClick, children }: ChipProps) => (
+  <button
+    className={cn(
+      "rounded-8 border px-3 py-1.5 text-[12.5px] font-medium transition-all",
+      active
+        ? "border-brand-600 bg-brand-50 text-brand-700"
+        : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50"
+    )}
+    type="button"
+    onClick={onClick}
+  >
+    {children}
+  </button>
+);
+
+interface SalaryBarProps {
   row: (typeof SALARY_DATA)[0];
   globalMax: number;
   fmt: (n: number) => string;
-}) {
+}
+
+const SalaryBar = ({ row, globalMax, fmt }: SalaryBarProps) => {
   const pct = (v: number) => `${(v / globalMax) * 100}%`;
   return (
     <div className="flex flex-col gap-3 border-b border-neutral-50 py-5 last:border-none sm:flex-row sm:items-center">
@@ -275,9 +269,9 @@ function SalaryBar({
       </div>
     </div>
   );
-}
+};
 
-function ExplorerSection() {
+const ExplorerSection = () => {
   const [role, setRole] = useState("Software Engineer");
   const [seniority, setSeniority] = useState("All");
   const [currency, setCurrency] = useState<"USD" | "VND">("USD");
@@ -392,9 +386,9 @@ function ExplorerSection() {
       </div>
     </section>
   );
-}
+};
 
-function CountrySection() {
+const CountrySection = () => {
   return (
     <section className="border-y border-neutral-100 bg-white py-16">
       <div className="mx-auto max-w-[1240px] px-6">
@@ -435,9 +429,9 @@ function CountrySection() {
       </div>
     </section>
   );
-}
+};
 
-function DistributionSection() {
+const DistributionSection = () => {
   const maxPct = Math.max(...HISTOGRAM_BUCKETS.map((b) => b.pct));
   return (
     <section className="bg-neutral-900 py-16">
@@ -495,9 +489,9 @@ function DistributionSection() {
       </div>
     </section>
   );
-}
+};
 
-function SubmitSection() {
+const SubmitSection = () => {
   return (
     <section className="py-16">
       <div className="mx-auto max-w-[1240px] px-6">
@@ -572,9 +566,9 @@ function SubmitSection() {
       </div>
     </section>
   );
-}
+};
 
-export function SalaryPage() {
+export const SalaryPage = () => {
   useDocumentTitle("Remote Salary Guide — Vietnam Talent");
   return (
     <>
@@ -629,4 +623,4 @@ export function SalaryPage() {
       <SubmitSection />
     </>
   );
-}
+};

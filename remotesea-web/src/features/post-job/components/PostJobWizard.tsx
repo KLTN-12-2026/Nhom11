@@ -31,7 +31,12 @@ const STEPS = [
   { id: 4, label: "Review & pay" },
 ];
 
-export function PostJobWizard() {
+const MIN_JOB_DESCRIPTION_LENGTH = 100;
+const MAX_SKILL_IDS = 15;
+const MAX_BENEFITS = 10;
+const PROFILE_ALREADY_EXISTS_STATUS = 409;
+
+export const PostJobWizard = () => {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<PostJobFormState>(INITIAL_FORM_STATE);
@@ -41,9 +46,9 @@ export function PostJobWizard() {
 
   const { data: categories } = useCategories();
   const { data: allSkills } = useSkills();
-  const createProfile = useCreateEmployerProfile();
-  const createJob = useCreateJob();
-  const createCheckout = useCreateCheckoutSession();
+  const createProfileMutation = useCreateEmployerProfile();
+  const createJobMutation = useCreateJob();
+  const createCheckoutMutation = useCreateCheckoutSession();
 
   // Default the category once real categories load — adjusted during render (not in
   // an effect) so it's applied in the same pass, guarded to run only once.
@@ -57,18 +62,18 @@ export function PostJobWizard() {
 
   const set = (k: keyof PostJobFormState, v: unknown) => setForm((prev) => ({ ...prev, [k]: v }));
 
-  function fail(msg: string) {
+  const fail = (msg: string) => {
     setError(msg);
     setPublishing(false);
     toast({ variant: "error", title: "Couldn't publish job", description: msg });
-  }
+  };
 
-  async function handlePublish() {
+  const handlePublish = async () => {
     setPublishing(true);
     setError(null);
 
-    if (form.jobDesc.trim().length < 100) {
-      fail("Job description must be at least 100 characters.");
+    if (form.jobDesc.trim().length < MIN_JOB_DESCRIPTION_LENGTH) {
+      fail(`Job description must be at least ${MIN_JOB_DESCRIPTION_LENGTH} characters.`);
       return;
     }
     if (!form.jobCategoryId) {
@@ -77,7 +82,7 @@ export function PostJobWizard() {
     }
 
     try {
-      await createProfile.mutateAsync({
+      await createProfileMutation.mutateAsync({
         companyName: form.coName,
         websiteUrl: form.coWeb || undefined,
         description: form.coAbout || undefined,
@@ -86,7 +91,7 @@ export function PostJobWizard() {
       });
     } catch (err) {
       // A 409 just means this employer already has a profile — fine, continue.
-      if (!(err instanceof ApiError && err.status === 409)) {
+      if (!(err instanceof ApiError && err.status === PROFILE_ALREADY_EXISTS_STATUS)) {
         fail("Could not save your company profile. Please try again.");
         return;
       }
@@ -96,11 +101,11 @@ export function PostJobWizard() {
     const skillIds = form.jobSkills
       .map((s) => skillIndex[s.toLowerCase()])
       .filter((id): id is string => Boolean(id))
-      .slice(0, 15);
+      .slice(0, MAX_SKILL_IDS);
 
     let jobId: string;
     try {
-      const job = await createJob.mutateAsync({
+      const job = await createJobMutation.mutateAsync({
         title: form.jobTitle,
         description: form.jobDesc,
         jobType: JOB_TYPE_TO_ENUM[form.jobType],
@@ -109,7 +114,7 @@ export function PostJobWizard() {
         salaryMax: form.salMax,
         timezone: form.jobTz || undefined,
         country: hqToCountry(form.coHq),
-        benefits: form.benefits.slice(0, 10),
+        benefits: form.benefits.slice(0, MAX_BENEFITS),
         planType: TIERS.find((t) => t.id === form.tier)?.planType ?? "STANDARD",
         categoryIds: [form.jobCategoryId],
         skillIds,
@@ -121,7 +126,7 @@ export function PostJobWizard() {
     }
 
     try {
-      const { url } = await createCheckout.mutateAsync(jobId);
+      const { url } = await createCheckoutMutation.mutateAsync(jobId);
       if (url) {
         window.location.href = url;
         return;
@@ -132,9 +137,11 @@ export function PostJobWizard() {
 
     setPublishing(false);
     setPublishedJobId(jobId);
-  }
+  };
 
   if (publishedJobId) return <PostJobDraftSaved form={form} jobId={publishedJobId} />;
+
+  const selectedTier = TIERS.find((t) => t.id === form.tier) ?? TIERS[0];
 
   return (
     <div className="min-h-screen bg-[#F8F7F4]">
@@ -241,21 +248,16 @@ export function PostJobWizard() {
               <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
                 Order summary
               </p>
-              {(() => {
-                const t = TIERS.find((x) => x.id === form.tier) ?? TIERS[0];
-                return (
-                  <div className="space-y-2 text-[13px]">
-                    <div className="flex justify-between text-neutral-600">
-                      <span>{t.name}</span>
-                      <span>${t.price}</span>
-                    </div>
-                    <div className="flex justify-between border-t border-neutral-100 pt-2 font-semibold text-neutral-900">
-                      <span>Total</span>
-                      <span>${t.price}</span>
-                    </div>
-                  </div>
-                );
-              })()}
+              <div className="space-y-2 text-[13px]">
+                <div className="flex justify-between text-neutral-600">
+                  <span>{selectedTier.name}</span>
+                  <span>${selectedTier.price}</span>
+                </div>
+                <div className="flex justify-between border-t border-neutral-100 pt-2 font-semibold text-neutral-900">
+                  <span>Total</span>
+                  <span>${selectedTier.price}</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 rounded-12 border border-neutral-100 bg-white p-3 text-[12px] text-neutral-400">
@@ -267,4 +269,4 @@ export function PostJobWizard() {
       </div>
     </div>
   );
-}
+};

@@ -4,17 +4,19 @@ import { useAuth } from "@/contexts/AuthContext";
 
 export const SAVED_JOBS_KEY = ["saved-jobs"];
 
-export function useSavedJobs() {
+const SAVED_JOBS_STALE_TIME_MS = 30_000;
+
+export const useSavedJobs = () => {
   const { user } = useAuth();
   return useQuery({
     queryKey: SAVED_JOBS_KEY,
     queryFn: listSavedJobs,
     enabled: !!user,
-    staleTime: 30_000,
+    staleTime: SAVED_JOBS_STALE_TIME_MS,
   });
-}
+};
 
-export function useToggleSavedJob() {
+export const useToggleSavedJob = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: toggleSavedJob,
@@ -22,4 +24,4 @@ export function useToggleSavedJob() {
       queryClient.invalidateQueries({ queryKey: SAVED_JOBS_KEY });
     },
   });
-}
+};

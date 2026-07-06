@@ -4,7 +4,7 @@ import { ResetPasswordForm } from "@/features/auth/components/ResetPasswordForm"
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 
-export function ResetPasswordPage() {
+export const ResetPasswordPage = () => {
   useDocumentTitle("Reset Password");
 
   return (
@@ -24,4 +24,4 @@ export function ResetPasswordPage() {
       <ResetPasswordForm />
     </div>
   );
-}
+};

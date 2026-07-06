@@ -41,21 +41,28 @@ const STATUS_MAP: Record<AppStatusBucket, { label: string; cls: string }> = {
 
 type TabId = "all" | "active" | "offers" | "closed";
 
-function CompletionRing({ pct }: { pct: number }) {
-  const r = 24;
-  const c = 2 * Math.PI * r;
-  const offset = c - (c * pct) / 100;
+const RECOMMENDED_JOBS_LIMIT = 20;
+const RECOMMENDED_JOBS_DISPLAY_COUNT = 3;
+
+interface CompletionRingProps {
+  pct: number;
+}
+
+const CompletionRing = ({ pct }: CompletionRingProps) => {
+  const radius = 24;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (circumference * pct) / 100;
   return (
     <div className="relative flex-shrink-0">
       <svg height="58" viewBox="0 0 58 58" width="58">
-        <circle className="stroke-neutral-100" cx="29" cy="29" fill="none" r={r} strokeWidth="5" />
+        <circle className="stroke-neutral-100" cx="29" cy="29" fill="none" r={radius} strokeWidth="5" />
         <circle
           className="stroke-brand-600"
           cx="29"
           cy="29"
           fill="none"
-          r={r}
-          strokeDasharray={c}
+          r={radius}
+          strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
           strokeWidth="5"
@@ -67,40 +74,39 @@ function CompletionRing({ pct }: { pct: number }) {
       </div>
     </div>
   );
-}
+};
 
-function KpiCard({
-  label,
-  icon: Icon,
-  value,
-  sub,
-}: {
+interface KpiCardProps {
   label: string;
   icon: React.ElementType;
   value: string;
   sub: string;
-}) {
-  return (
-    <div className="rounded-16 border border-neutral-100 bg-white p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">{label}</span>
-        <Icon className="text-neutral-300" size={13} />
-      </div>
-      <div className="mb-1 text-[28px] font-semibold tracking-tight text-neutral-900">{value}</div>
-      <span className="text-[12px] text-neutral-400">{sub}</span>
-    </div>
-  );
 }
 
-function Pipeline({ applications }: { applications: ApplicationWithJob[] }) {
-  const count = (s: AppStatusBucket) =>
-    applications.filter((a) => STATUS_TO_BUCKET[a.status] === s).length;
+const KpiCard = ({ label, icon: Icon, value, sub }: KpiCardProps) => (
+  <div className="rounded-16 border border-neutral-100 bg-white p-5">
+    <div className="mb-3 flex items-center justify-between">
+      <span className="text-[11px] font-semibold uppercase tracking-widest text-neutral-400">{label}</span>
+      <Icon className="text-neutral-300" size={13} />
+    </div>
+    <div className="mb-1 text-[28px] font-semibold tracking-tight text-neutral-900">{value}</div>
+    <span className="text-[12px] text-neutral-400">{sub}</span>
+  </div>
+);
+
+interface PipelineProps {
+  applications: ApplicationWithJob[];
+}
+
+const Pipeline = ({ applications }: PipelineProps) => {
+  const countByBucket = (bucket: AppStatusBucket) =>
+    applications.filter((a) => STATUS_TO_BUCKET[a.status] === bucket).length;
   const stages: { label: string; n: number; active?: boolean }[] = [
-    { label: "Applied", n: count("applied") },
-    { label: "In review", n: count("review") },
-    { label: "Interviewing", n: count("interview"), active: true },
-    { label: "Offers", n: count("offer") },
-    { label: "Closed", n: count("closed") },
+    { label: "Applied", n: countByBucket("applied") },
+    { label: "In review", n: countByBucket("review") },
+    { label: "Interviewing", n: countByBucket("interview"), active: true },
+    { label: "Offers", n: countByBucket("offer") },
+    { label: "Closed", n: countByBucket("closed") },
   ];
   return (
     <div className="flex border-b border-neutral-100 bg-neutral-50/50">
@@ -128,13 +134,17 @@ function Pipeline({ applications }: { applications: ApplicationWithJob[] }) {
       ))}
     </div>
   );
+};
+
+interface ApplicationsTableProps {
+  applications: ApplicationWithJob[];
 }
 
-function ApplicationsTable({ applications }: { applications: ApplicationWithJob[] }) {
+const ApplicationsTable = ({ applications }: ApplicationsTableProps) => {
   const [tab, setTab] = useState<TabId>("active");
 
-  const inBucket = (a: ApplicationWithJob, bucket: AppStatusBucket[]) =>
-    bucket.includes(STATUS_TO_BUCKET[a.status]);
+  const inBucket = (a: ApplicationWithJob, buckets: AppStatusBucket[]) =>
+    buckets.includes(STATUS_TO_BUCKET[a.status]);
 
   const tabs: { id: TabId; label: string; count: number }[] = [
     { id: "all", label: "All", count: applications.length },
@@ -228,12 +238,18 @@ function ApplicationsTable({ applications }: { applications: ApplicationWithJob[
       )}
     </div>
   );
+};
+
+interface RecommendedJobsProps {
+  applications: ApplicationWithJob[];
 }
 
-function RecommendedJobs({ applications }: { applications: ApplicationWithJob[] }) {
-  const { data } = useJobsQuery(DEFAULT_FILTERS, 20);
+const RecommendedJobs = ({ applications }: RecommendedJobsProps) => {
+  const { data } = useJobsQuery(DEFAULT_FILTERS, RECOMMENDED_JOBS_LIMIT);
   const appliedIds = new Set(applications.map((a) => a.jobId));
-  const recommended = (data?.jobs ?? []).filter((j) => !appliedIds.has(j.id)).slice(0, 3);
+  const recommended = (data?.jobs ?? [])
+    .filter((j) => !appliedIds.has(j.id))
+    .slice(0, RECOMMENDED_JOBS_DISPLAY_COUNT);
 
   if (recommended.length === 0) return null;
 
@@ -281,9 +297,9 @@ function RecommendedJobs({ applications }: { applications: ApplicationWithJob[] 
       </div>
     </div>
   );
-}
+};
 
-function ProfileSnapshot() {
+const ProfileSnapshot = () => {
   const { user } = useAuth();
   const { data: profile } = useMyTalentProfile();
 
@@ -327,9 +343,9 @@ function ProfileSnapshot() {
       </div>
     </div>
   );
-}
+};
 
-export function TalentDashboard() {
+export const TalentDashboard = () => {
   const { user } = useAuth();
   const { data: applications = [] } = useMyApplications();
   const { data: profile } = useMyTalentProfile();
@@ -410,4 +426,4 @@ export function TalentDashboard() {
       </div>
     </div>
   );
-}
+};

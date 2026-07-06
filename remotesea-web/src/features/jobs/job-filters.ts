@@ -58,11 +58,9 @@ export const FILTER_OPTIONS = {
   category: ["Engineering", "Design", "Data", "Product", "Marketing"],
 };
 
-function toArray(value: string[] | undefined): string[] {
-  return value ?? [];
-}
+const toArray = (value: string[] | undefined): string[] => value ?? [];
 
-export function parseJobQuery(params: URLSearchParams): JobFilters {
+export const parseJobQuery = (params: URLSearchParams): JobFilters => {
   const sortRaw = params.get("sort") as SortKey | null;
   const salaryMin = Number(params.get("salaryMin")) || SALARY_FLOOR;
   const salaryMax = Number(params.get("salaryMax")) || SALARY_CEIL;
@@ -80,9 +78,9 @@ export function parseJobQuery(params: URLSearchParams): JobFilters {
       salaryMax,
     },
   };
-}
+};
 
-export function serializeJobQuery(query: JobFilters): string {
+export const serializeJobQuery = (query: JobFilters): string => {
   const p = new URLSearchParams();
   if (query.q) p.set("q", query.q);
   query.filters.jobType.forEach((v) => p.append("type", v));
@@ -94,14 +92,11 @@ export function serializeJobQuery(query: JobFilters): string {
   if (query.sort !== "recent") p.set("sort", query.sort);
   if (query.page > 1) p.set("page", String(query.page));
   return p.toString();
-}
+};
 
-export function countActiveFilters(filters: Filters): number {
-  return (
-    filters.jobType.length +
-    filters.timezone.length +
-    filters.category.length +
-    filters.seniority.length +
-    (filters.salaryMin > SALARY_FLOOR || filters.salaryMax < SALARY_CEIL ? 1 : 0)
-  );
-}
+export const countActiveFilters = (filters: Filters): number =>
+  filters.jobType.length +
+  filters.timezone.length +
+  filters.category.length +
+  filters.seniority.length +
+  (filters.salaryMin > SALARY_FLOOR || filters.salaryMax < SALARY_CEIL ? 1 : 0);

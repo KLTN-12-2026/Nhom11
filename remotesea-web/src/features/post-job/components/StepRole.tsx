@@ -12,16 +12,10 @@ import {
   PERIOD_OPTIONS,
   SENIORITY_OPTIONS,
   TIMEZONE_OPTIONS,
-  type PostJobFormState,
+  type PostJobStepProps,
 } from "@/features/post-job/post-job.schemas";
 
-export function StepRole({
-  form,
-  set,
-}: {
-  form: PostJobFormState;
-  set: (k: keyof PostJobFormState, v: unknown) => void;
-}) {
+export const StepRole = ({ form, set }: PostJobStepProps) => {
   const { data: categories } = useCategories();
 
   return (
@@ -167,4 +161,4 @@ export function StepRole({
       </div>
     </div>
   );
-}
+};

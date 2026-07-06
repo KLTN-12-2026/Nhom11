@@ -4,10 +4,15 @@ import { ROUTES } from "@/constants/routes";
 import type { PostJobFormState } from "@/features/post-job/post-job.schemas";
 import { TIERS } from "@/features/post-job/post-job.schemas";
 
+interface PostJobDraftSavedProps {
+  form: PostJobFormState;
+  jobId: string;
+}
+
 // Shown when Stripe isn't configured on the backend and checkout couldn't be started —
 // the job was still created (as an unpaid DRAFT), so this confirms that honestly
 // instead of implying a payment succeeded.
-export function PostJobDraftSaved({ form, jobId }: { form: PostJobFormState; jobId: string }) {
+export const PostJobDraftSaved = ({ form, jobId }: PostJobDraftSavedProps) => {
   const tier = TIERS.find((t) => t.id === form.tier) ?? TIERS[0];
 
   return (
@@ -50,4 +55,4 @@ export function PostJobDraftSaved({ form, jobId }: { form: PostJobFormState; job
       </Link>
     </div>
   );
-}
+};

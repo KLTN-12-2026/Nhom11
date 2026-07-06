@@ -140,7 +140,7 @@ const AVATAR_CLOUD = [
   { l: "Q", c: "#65A30D", x: 110, y: 70, s: 50 },
 ];
 
-export function CommunityPage() {
+export const CommunityPage = () => {
   useDocumentTitle("Community — RemoteSEA");
   return (
     <>
@@ -462,4 +462,4 @@ export function CommunityPage() {
       </section>
     </>
   );
-}
+};

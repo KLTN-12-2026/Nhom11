@@ -83,7 +83,7 @@ const AdminPage = lazy(() =>
   import("@/features/admin/pages/AdminPage").then((m) => ({ default: m.AdminPage }))
 );
 
-export function AppRouter() {
+export const AppRouter = () => {
   return (
     <Suspense fallback={<FullPageLoader />}>
       <Routes>
@@ -128,4 +128,4 @@ export function AppRouter() {
       </Routes>
     </Suspense>
   );
-}
+};

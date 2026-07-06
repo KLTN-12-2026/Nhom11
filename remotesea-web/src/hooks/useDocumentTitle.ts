@@ -1,11 +1,11 @@
 import { useEffect } from "react";
 
-export function useDocumentTitle(title: string): void {
+export const useDocumentTitle = (title: string): void => {
   useEffect(() => {
-    const previous = document.title;
+    const previousTitle = document.title;
     document.title = `${title} | RemoteSEA`;
     return () => {
-      document.title = previous;
+      document.title = previousTitle;
     };
   }, [title]);
-}
+};

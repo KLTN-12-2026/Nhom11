@@ -123,7 +123,7 @@ const POPULAR = [
 
 const CATEGORIES = ["All", "Negotiation", "Salary", "Async Work", "Interview", "Career", "Tools"];
 
-export function BlogPage() {
+export const BlogPage = () => {
   useDocumentTitle("Field Notes — RemoteSEA Blog");
   const [activeCat, setActiveCat] = useState("All");
 
@@ -344,4 +344,4 @@ export function BlogPage() {
       </section>
     </>
   );
-}
+};
