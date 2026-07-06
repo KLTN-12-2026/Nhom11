@@ -1,8 +1,8 @@
 import { Check } from "lucide-react";
 import { Field, Input, Select, Textarea } from "@/features/post-job/components/form-primitives";
 import { SkillTagEditor } from "@/components/shared/SkillTagEditor";
+import { PillToggle } from "@/components/shared/PillToggle";
 import { useCategories } from "@/features/taxonomy/taxonomy.queries";
-import { cn } from "@/utils/cn";
 import {
   BENEFIT_OPTIONS,
   CURRENCY_OPTIONS,
@@ -134,15 +134,12 @@ export const StepRole = ({ form, set }: PostJobStepProps) => {
           <p className="mb-2 text-[13px] font-medium text-neutral-700">Benefits</p>
           <div className="flex flex-wrap gap-2">
             {BENEFIT_OPTIONS.map((b) => (
-              <button
-                className={cn(
-                  "rounded-full border px-3 py-1 text-[12px] font-medium transition-all",
-                  form.benefits.includes(b)
-                    ? "border-brand-600 bg-brand-50 text-brand-700"
-                    : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300"
-                )}
+              <PillToggle
+                active={form.benefits.includes(b)}
+                activeClassName="border-brand-600 bg-brand-50 text-brand-700"
+                className="border px-3 py-1 text-[12px] font-medium transition-all"
+                inactiveClassName="border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300"
                 key={b}
-                type="button"
                 onClick={() =>
                   set(
                     "benefits",
@@ -154,7 +151,7 @@ export const StepRole = ({ form, set }: PostJobStepProps) => {
               >
                 {form.benefits.includes(b) && <Check className="mr-1 inline" size={10} />}
                 {b}
-              </button>
+              </PillToggle>
             ))}
           </div>
         </div>

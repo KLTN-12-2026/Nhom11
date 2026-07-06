@@ -3,6 +3,7 @@ import { Briefcase, Building, Search, Shield, Wallet } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
 import { EmptyRow } from "@/components/shared/EmptyRow";
+import { PillToggle } from "@/components/shared/PillToggle";
 import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
@@ -86,13 +87,16 @@ export const AdminEmployers = () => {
       <div className="mb-4 flex items-center gap-3">
         <div className="flex gap-1">
           {FILTERS.map((f) => (
-            <button
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${filter === f.id ? "bg-brand-600 text-white" : "border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"}`}
+            <PillToggle
+              active={filter === f.id}
+              activeClassName="bg-brand-600 text-white"
+              className="px-3.5 py-1.5 text-[13px] font-medium transition-colors"
+              inactiveClassName="border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
               key={f.id}
               onClick={() => setFilter(f.id)}
             >
               {f.label} <span className={`ml-1 text-[11px] ${filter === f.id ? "text-white/70" : "text-neutral-400"}`}>{counts[f.id]}</span>
-            </button>
+            </PillToggle>
           ))}
         </div>
         <div className="ml-auto flex h-9 items-center gap-2 rounded-10 border border-neutral-200 bg-white px-3">

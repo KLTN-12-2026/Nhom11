@@ -1,5 +1,5 @@
 import { Bell, Trash2 } from "lucide-react";
-import { cn } from "@/utils/cn";
+import { PillToggle } from "@/components/shared/PillToggle";
 import type { JobAlert } from "@/types/alert";
 
 interface AlertListItemProps {
@@ -29,17 +29,15 @@ export const AlertListItem = ({ alert, onToggleActive, onDelete }: AlertListItem
       <p className="text-[14px] font-medium text-neutral-900">{alert.name}</p>
       <p className="truncate text-[12px] text-neutral-400">{summarizeAlert(alert)}</p>
     </div>
-    <button
-      aria-pressed={alert.isActive}
-      className={cn(
-        "rounded-full px-2.5 py-1 text-[11px] font-medium",
-        alert.isActive ? "bg-brand-50 text-brand-700" : "bg-neutral-100 text-neutral-500"
-      )}
-      type="button"
+    <PillToggle
+      active={alert.isActive}
+      activeClassName="bg-brand-50 text-brand-700"
+      className="px-2.5 py-1 text-[11px] font-medium"
+      inactiveClassName="bg-neutral-100 text-neutral-500"
       onClick={() => onToggleActive(alert)}
     >
       {alert.isActive ? "Active" : "Paused"}
-    </button>
+    </PillToggle>
     <button
       aria-label="Delete alert"
       className="grid h-8 w-8 place-items-center rounded-8 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600"
