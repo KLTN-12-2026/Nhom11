@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { useSavedJobs, useToggleSavedJob } from "@/features/saved/saved.queries";
+import { useSavedJobs, useSaveJob, useUnsaveJob } from "@/features/saved/saved.queries";
 import { ROUTES } from "@/constants/routes";
 
 interface UseSavedJobToggleResult {
@@ -20,7 +20,8 @@ export const useSavedJobToggle = (jobId: string, loginCallbackUrl: string): UseS
   const navigate = useNavigate();
   const { toast } = useToast();
   const { data: savedJobs, isLoading: savedStatusLoading } = useSavedJobs();
-  const toggleSavedMutation = useToggleSavedJob();
+  const saveMutation = useSaveJob();
+  const unsaveMutation = useUnsaveJob();
   const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
 
   const statusUnknown = !!user && savedStatusLoading;
@@ -36,7 +37,11 @@ export const useSavedJobToggle = (jobId: string, loginCallbackUrl: string): UseS
     const prev = saved;
     setOptimisticSaved(!prev);
     try {
-      await toggleSavedMutation.mutateAsync(jobId);
+      if (prev) {
+        await unsaveMutation.mutateAsync(jobId);
+      } else {
+        await saveMutation.mutateAsync(jobId);
+      }
       toast({ variant: "success", title: prev ? "Removed from saved" : "Saved to your list" });
     } catch {
       setOptimisticSaved(prev);
