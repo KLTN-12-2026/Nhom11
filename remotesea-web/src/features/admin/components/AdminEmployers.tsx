@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Briefcase, Building, Search, Shield, Wallet } from "lucide-react";
 import { useToast } from "@/components/ui/toast";
 import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
@@ -7,6 +7,7 @@ import { PillToggle } from "@/components/shared/PillToggle";
 import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
+import type { AdminEmployer } from "@/types/admin";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -15,6 +16,73 @@ const FILTERS = [
 
 const CENTS_PER_DOLLAR = 100;
 const DOLLARS_PER_THOUSAND = 1000;
+
+interface EmployerRowProps {
+  employer: AdminEmployer;
+  maxSpend: number;
+  isPending: boolean;
+  onStatusChange: (id: string, action: "verify" | "suspend") => void;
+}
+
+const EmployerRow = memo(function EmployerRow({
+  employer: e,
+  maxSpend,
+  isPending,
+  onStatusChange,
+}: EmployerRowProps) {
+  return (
+    <div
+      className="grid items-center border-b border-neutral-50 px-5 py-4 transition-colors last:border-0 hover:bg-neutral-50"
+      style={{ gridTemplateColumns: "1fr 90px 140px 100px 32px" }}
+    >
+      <div className="flex items-center gap-3">
+        <CompanyInitial color={colorFor(e.companyName)} name={e.companyName} />
+        <div>
+          <div className="flex items-center gap-1.5 text-[14px] font-semibold text-neutral-900">
+            {e.companyName}
+            <VerifiedBadge isVerified={e.isVerified} />
+          </div>
+          <div className="text-[12px] text-neutral-400">
+            {e.user.email} · {e.hqCountry ?? "—"}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 text-[14px] font-semibold text-neutral-900">
+        <Briefcase className="text-neutral-300" size={12} /> {e.jobCount}
+      </div>
+      <div>
+        <div className="mb-1 font-mono text-[13px] font-semibold text-neutral-900">
+          ${(e.totalSpend / CENTS_PER_DOLLAR).toLocaleString()}
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-neutral-100">
+          <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }} />
+        </div>
+      </div>
+      <span className="text-[13px] text-neutral-400">
+        {new Date(e.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+      </span>
+      {e.isVerified ? (
+        <button
+          className="rounded-6 border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
+          disabled={isPending}
+          type="button"
+          onClick={() => onStatusChange(e.id, "suspend")}
+        >
+          Suspend
+        </button>
+      ) : (
+        <button
+          className="rounded-6 border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-60"
+          disabled={isPending}
+          type="button"
+          onClick={() => onStatusChange(e.id, "verify")}
+        >
+          Verify
+        </button>
+      )}
+    </div>
+  );
+});
 
 export const AdminEmployers = () => {
   const { toast } = useToast();
@@ -25,17 +93,21 @@ export const AdminEmployers = () => {
 
   const employers = data?.employers ?? [];
 
-  const updateEmployerStatus = async (id: string, action: "verify" | "suspend") => {
-    try {
-      await updateEmployerMutation.mutateAsync({ id, action });
-      toast({
-        variant: action === "verify" ? "success" : "info",
-        title: action === "verify" ? "Employer verified" : "Employer suspended",
-      });
-    } catch {
-      toast({ variant: "error", title: "Couldn't update employer" });
-    }
-  };
+  const { mutateAsync: updateEmployer } = updateEmployerMutation;
+  const updateEmployerStatus = useCallback(
+    async (id: string, action: "verify" | "suspend") => {
+      try {
+        await updateEmployer({ id, action });
+        toast({
+          variant: action === "verify" ? "success" : "info",
+          title: action === "verify" ? "Employer verified" : "Employer suspended",
+        });
+      } catch {
+        toast({ variant: "error", title: "Couldn't update employer" });
+      }
+    },
+    [updateEmployer, toast]
+  );
 
   const rows = employers.filter((e) => {
     if (filter === "unverified" && e.isVerified) return false;
@@ -127,57 +199,13 @@ export const AdminEmployers = () => {
           <EmptyRow>No employers match this filter.</EmptyRow>
         ) : (
           rows.map((e) => (
-            <div
-              className="grid items-center border-b border-neutral-50 px-5 py-4 transition-colors last:border-0 hover:bg-neutral-50"
+            <EmployerRow
+              employer={e}
+              isPending={updateEmployerMutation.isPending}
               key={e.id}
-              style={{ gridTemplateColumns: "1fr 90px 140px 100px 32px" }}
-            >
-              <div className="flex items-center gap-3">
-                <CompanyInitial color={colorFor(e.companyName)} name={e.companyName} />
-                <div>
-                  <div className="flex items-center gap-1.5 text-[14px] font-semibold text-neutral-900">
-                    {e.companyName}
-                    <VerifiedBadge isVerified={e.isVerified} />
-                  </div>
-                  <div className="text-[12px] text-neutral-400">
-                    {e.user.email} · {e.hqCountry ?? "—"}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-[14px] font-semibold text-neutral-900">
-                <Briefcase className="text-neutral-300" size={12} /> {e.jobCount}
-              </div>
-              <div>
-                <div className="mb-1 font-mono text-[13px] font-semibold text-neutral-900">
-                  ${(e.totalSpend / CENTS_PER_DOLLAR).toLocaleString()}
-                </div>
-                <div className="h-1 overflow-hidden rounded-full bg-neutral-100">
-                  <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }} />
-                </div>
-              </div>
-              <span className="text-[13px] text-neutral-400">
-                {new Date(e.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-              </span>
-              {e.isVerified ? (
-                <button
-                  className="rounded-6 border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
-                  disabled={updateEmployerMutation.isPending}
-                  type="button"
-                  onClick={() => updateEmployerStatus(e.id, "suspend")}
-                >
-                  Suspend
-                </button>
-              ) : (
-                <button
-                  className="rounded-6 border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-60"
-                  disabled={updateEmployerMutation.isPending}
-                  type="button"
-                  onClick={() => updateEmployerStatus(e.id, "verify")}
-                >
-                  Verify
-                </button>
-              )}
-            </div>
+              maxSpend={maxSpend}
+              onStatusChange={updateEmployerStatus}
+            />
           ))
         )}
       </div>

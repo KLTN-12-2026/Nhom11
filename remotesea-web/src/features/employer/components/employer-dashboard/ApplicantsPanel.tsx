@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Check, X } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useToast } from "@/components/ui/toast";
@@ -33,6 +33,69 @@ const APPLICANT_STATUS_LABEL: Record<ApplicantStatusGroup, string> = {
   archived: "Archived",
 };
 
+interface ApplicantRowProps {
+  applicant: ApplicantWithJob;
+  isPending: boolean;
+  onStatusChange: (id: string, status: ApplicationStatus) => void;
+}
+
+const ApplicantRow = memo(function ApplicantRow({ applicant: a, isPending, onStatusChange }: ApplicantRowProps) {
+  const name = a.talent.user.name ?? "Candidate";
+  const initial = name.split(" ").slice(-1)[0]?.[0]?.toUpperCase() ?? "C";
+  const group = APPLICANT_STATUS[a.status];
+  const nextStatus = NEXT_STAGE[a.status];
+  return (
+    <div className="group flex items-center gap-3 rounded-12 px-2 py-3 transition-colors hover:bg-neutral-50">
+      <div
+        className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
+        style={{ background: colorFor(name) }}
+      >
+        {initial}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[13.5px] font-medium text-neutral-900">{name}</span>
+        </div>
+        <div className="text-[11.5px] text-neutral-400">
+          {a.talent.headline ?? a.talent.level}
+          <span className="text-neutral-300"> · for {a.jobTitle}</span>
+        </div>
+      </div>
+
+      <div className="flex-shrink-0 text-right">
+        <div className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", APPLICANT_STATUS_CLASS[group])}>
+          {APPLICANT_STATUS_LABEL[group]}
+        </div>
+      </div>
+
+      {nextStatus && a.status !== "REJECTED" ? (
+        <div className="flex flex-shrink-0 items-center gap-1">
+          <button
+            className="inline-flex items-center gap-1 rounded-8 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-50"
+            disabled={isPending}
+            type="button"
+            onClick={() => onStatusChange(a.id, nextStatus)}
+          >
+            <Check size={11} /> {NEXT_LABEL[a.status]}
+          </button>
+          <button
+            aria-label="Reject applicant"
+            className="grid h-7 w-7 place-items-center rounded-8 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+            disabled={isPending}
+            type="button"
+            onClick={() => onStatusChange(a.id, "REJECTED")}
+          >
+            <X size={13} />
+          </button>
+        </div>
+      ) : (
+        <div className="flex-shrink-0 text-[11px] text-neutral-400">{timeAgo(a.appliedAt)}</div>
+      )}
+    </div>
+  );
+});
+
 interface ApplicantsPanelProps {
   applicants: ApplicantWithJob[];
 }
@@ -53,17 +116,21 @@ export const ApplicantsPanel = ({ applicants }: ApplicantsPanelProps) => {
   ];
   const list = tab === "all" ? applicants : applicants.filter((a) => APPLICANT_STATUS[a.status] === tab);
 
-  const updateApplicantStatus = async (id: string, status: ApplicationStatus) => {
-    try {
-      await updateStatusMutation.mutateAsync({ id, status });
-      toast({
-        variant: status === "REJECTED" ? "info" : "success",
-        title: status === "REJECTED" ? "Applicant rejected" : "Applicant advanced",
-      });
-    } catch {
-      toast({ variant: "error", title: "Couldn't update applicant" });
-    }
-  };
+  const { mutateAsync: updateStatus } = updateStatusMutation;
+  const updateApplicantStatus = useCallback(
+    async (id: string, status: ApplicationStatus) => {
+      try {
+        await updateStatus({ id, status });
+        toast({
+          variant: status === "REJECTED" ? "info" : "success",
+          title: status === "REJECTED" ? "Applicant rejected" : "Applicant advanced",
+        });
+      } catch {
+        toast({ variant: "error", title: "Couldn't update applicant" });
+      }
+    },
+    [updateStatus, toast]
+  );
 
   return (
     <div className="rounded-20 border border-neutral-100 bg-white p-5">
@@ -98,62 +165,14 @@ export const ApplicantsPanel = ({ applicants }: ApplicantsPanelProps) => {
         <EmptyRow>No applicants yet.</EmptyRow>
       ) : (
         <div className="divide-y divide-neutral-50">
-          {list.slice(0, RECENT_APPLICANTS_DISPLAY_COUNT).map((a) => {
-            const name = a.talent.user.name ?? "Candidate";
-            const initial = name.split(" ").slice(-1)[0]?.[0]?.toUpperCase() ?? "C";
-            const group = APPLICANT_STATUS[a.status];
-            const nextStatus = NEXT_STAGE[a.status];
-            return (
-              <div className="group flex items-center gap-3 rounded-12 px-2 py-3 transition-colors hover:bg-neutral-50" key={a.id}>
-                <div
-                  className="relative flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-white"
-                  style={{ background: colorFor(name) }}
-                >
-                  {initial}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[13.5px] font-medium text-neutral-900">{name}</span>
-                  </div>
-                  <div className="text-[11.5px] text-neutral-400">
-                    {a.talent.headline ?? a.talent.level}
-                    <span className="text-neutral-300"> · for {a.jobTitle}</span>
-                  </div>
-                </div>
-
-                <div className="flex-shrink-0 text-right">
-                  <div className={cn("rounded-full px-1.5 py-0.5 text-[10px] font-medium", APPLICANT_STATUS_CLASS[group])}>
-                    {APPLICANT_STATUS_LABEL[group]}
-                  </div>
-                </div>
-
-                {nextStatus && a.status !== "REJECTED" ? (
-                  <div className="flex flex-shrink-0 items-center gap-1">
-                    <button
-                      className="inline-flex items-center gap-1 rounded-8 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-50"
-                      disabled={updateStatusMutation.isPending}
-                      type="button"
-                      onClick={() => updateApplicantStatus(a.id, nextStatus)}
-                    >
-                      <Check size={11} /> {NEXT_LABEL[a.status]}
-                    </button>
-                    <button
-                      aria-label="Reject applicant"
-                      className="grid h-7 w-7 place-items-center rounded-8 text-neutral-400 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                      disabled={updateStatusMutation.isPending}
-                      type="button"
-                      onClick={() => updateApplicantStatus(a.id, "REJECTED")}
-                    >
-                      <X size={13} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex-shrink-0 text-[11px] text-neutral-400">{timeAgo(a.appliedAt)}</div>
-                )}
-              </div>
-            );
-          })}
+          {list.slice(0, RECENT_APPLICANTS_DISPLAY_COUNT).map((a) => (
+            <ApplicantRow
+              applicant={a}
+              isPending={updateStatusMutation.isPending}
+              key={a.id}
+              onStatusChange={updateApplicantStatus}
+            />
+          ))}
         </div>
       )}
     </div>

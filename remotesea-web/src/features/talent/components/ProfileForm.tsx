@@ -25,10 +25,9 @@ import {
   TIMEZONE_OPTIONS,
   bucketToYears,
   normalizeUrl,
-  profileFormSchema,
   yearsToBucket,
-  type ProfileFormValues,
-} from "@/features/talent/talent.schemas";
+} from "@/features/talent/talent.constants";
+import { profileFormSchema, type ProfileFormValues } from "@/features/talent/talent.schemas";
 import { ROUTES } from "@/constants/routes";
 import type { TalentProfile } from "@/types/talent";
 
@@ -251,7 +250,7 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
             <LinksSection
               onResumeUploaded={(url) => setValue("resumeUrl", url)}
               register={register}
-              resumeUrl={resumeUrl}
+              resumeUrl={resumeUrl ?? ""}
             />
 
             <VisibilitySection isOpenToWork={isOpenToWork} onToggle={(v) => setValue("isOpenToWork", v)} />

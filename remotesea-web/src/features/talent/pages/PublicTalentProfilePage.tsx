@@ -4,7 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { usePublicTalentProfile } from "@/features/talent/talent.queries";
 import { useAuth } from "@/contexts/AuthContext";
-import { LEVEL_TO_LABEL } from "@/features/talent/talent.schemas";
+import { LEVEL_TO_LABEL } from "@/features/talent/talent.constants";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { ROUTES } from "@/constants/routes";
 

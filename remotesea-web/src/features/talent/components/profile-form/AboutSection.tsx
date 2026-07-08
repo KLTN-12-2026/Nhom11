@@ -1,7 +1,8 @@
 import type { UseFormRegister } from "react-hook-form";
 import { SectionHead, EMPHASIS_STYLE } from "@/features/talent/components/profile-form/SectionHead";
 import { SELECT_INPUT_CLASS } from "@/features/talent/components/profile-form/profile-form.constants";
-import { SENIORITY_OPTIONS, YEARS_BUCKETS, type ProfileFormValues } from "@/features/talent/talent.schemas";
+import { SENIORITY_OPTIONS, YEARS_BUCKETS } from "@/features/talent/talent.constants";
+import type { ProfileFormValues } from "@/features/talent/talent.schemas";
 
 interface AboutSectionProps {
   register: UseFormRegister<ProfileFormValues>;
