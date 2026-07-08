@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToastMutation } from "@/hooks/useToastMutation";
 import { useAdminJobs, useReviewAdminJob } from "@/features/admin/admin.queries";
 import { hoursSince, REVIEW_CHECKLIST, URGENT_WAIT_HOURS } from "@/features/admin/admin.utils";
+import { AdminQueueSkeleton } from "@/features/admin/components/admin-queue/AdminQueueSkeleton";
 import { QueueKpis } from "@/features/admin/components/admin-queue/QueueKpis";
 import { QueueListPane } from "@/features/admin/components/admin-queue/QueueListPane";
 import { ResolutionBanner, type ResolutionKind } from "@/features/admin/components/admin-queue/ResolutionBanner";
@@ -70,7 +71,7 @@ export const AdminQueue = () => {
   };
 
   if (isLoading) {
-    return <p className="text-sm text-neutral-400">Loading queue…</p>;
+    return <AdminQueueSkeleton />;
   }
 
   if (queue.length === 0) {

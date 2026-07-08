@@ -147,6 +147,7 @@ export const PostJobWizard = () => {
     <div className="min-h-screen bg-[#F8F7F4]">
       {/* Top bar */}
       <div className="border-b border-neutral-200 bg-white px-6 py-4">
+        <h1 className="sr-only">Post a job</h1>
         <div className="mx-auto flex max-w-[1200px] items-center justify-between">
           <Link className="text-[15px] font-semibold text-neutral-900" to={ROUTES.home}>
             RemoteSEA

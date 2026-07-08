@@ -5,6 +5,7 @@ import { EmptyRow } from "@/components/shared/EmptyRow";
 import { PillToggle } from "@/components/shared/PillToggle";
 import { CompanyLogo } from "@/components/ui/company-logo";
 import { useToastMutation } from "@/hooks/useToastMutation";
+import { AdminEmployersSkeleton } from "@/features/admin/components/AdminEmployersSkeleton";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
 import type { AdminEmployer } from "@/types/admin";
@@ -125,7 +126,7 @@ export const AdminEmployers = () => {
   const totalListings = employers.reduce((a, e) => a + e.jobCount, 0);
   const maxSpend = Math.max(1, ...employers.map((e) => e.totalSpend));
 
-  if (isLoading) return <p className="text-sm text-neutral-400">Loading employers…</p>;
+  if (isLoading) return <AdminEmployersSkeleton />;
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -198,7 +199,7 @@ export const AdminEmployers = () => {
             </PillToggle>
           ))}
         </div>
-        <div className="rounded-10 ml-auto flex h-9 items-center gap-2 border border-neutral-200 bg-white px-3">
+        <div className="rounded-10 ml-auto flex h-9 items-center gap-2 border border-neutral-200 bg-white px-3 focus-within:border-brand-600 focus-within:shadow-focus">
           <Search className="text-neutral-400" size={14} />
           <input
             aria-label="Search employers"
