@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
+import { reportError } from "@/services/monitoring";
 
 type Props = { children: ReactNode };
 type State = { error: Error | null };
@@ -13,6 +14,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     console.error("Unhandled UI error:", error, info.componentStack);
+    reportError(error, info.componentStack ?? undefined);
   }
 
   render() {
