@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -22,11 +21,9 @@ export const useSavedJobToggle = (jobId: string, loginCallbackUrl: string): UseS
   const { data: savedJobs, isLoading: savedStatusLoading } = useSavedJobs();
   const saveMutation = useSaveJob();
   const unsaveMutation = useUnsaveJob();
-  const [optimisticSaved, setOptimisticSaved] = useState<boolean | null>(null);
 
   const statusUnknown = !!user && savedStatusLoading;
-  const savedFromServer = savedJobs?.some((s) => s.jobId === jobId) ?? false;
-  const saved = optimisticSaved ?? savedFromServer;
+  const saved = savedJobs?.some((s) => s.jobId === jobId) ?? false;
 
   const toggle = async (e?: React.MouseEvent) => {
     e?.preventDefault();
@@ -35,7 +32,6 @@ export const useSavedJobToggle = (jobId: string, loginCallbackUrl: string): UseS
       return;
     }
     const prev = saved;
-    setOptimisticSaved(!prev);
     try {
       if (prev) {
         await unsaveMutation.mutateAsync(jobId);
@@ -44,7 +40,6 @@ export const useSavedJobToggle = (jobId: string, loginCallbackUrl: string): UseS
       }
       toast({ variant: "success", title: prev ? "Removed from saved" : "Saved to your list" });
     } catch {
-      setOptimisticSaved(prev);
       toast({ variant: "error", title: "Couldn't update saved jobs" });
     }
   };
