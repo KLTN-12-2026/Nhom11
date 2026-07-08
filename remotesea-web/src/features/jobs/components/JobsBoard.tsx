@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { SearchBar } from "@/features/jobs/components/SearchBar";
 import { FilterSidebar } from "@/features/jobs/components/FilterSidebar";
@@ -6,6 +6,7 @@ import { JobCard } from "@/features/jobs/components/JobCard";
 import { JobCardSkeleton } from "@/features/jobs/components/JobCardSkeleton";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { useSyncedState } from "@/hooks/useSyncedState";
 import { useJobsQuery } from "@/features/jobs/jobs.queries";
 import { useCategories } from "@/features/taxonomy/taxonomy.queries";
 import {
@@ -34,18 +35,10 @@ const SEARCH_DEBOUNCE_MS = 400;
 const JOB_LIST_SKELETON_COUNT = 6;
 
 export const JobsBoard = ({ filters: query, onFiltersChange }: JobsBoardProps) => {
-  const [search, setSearch] = useState(query.q);
-  const [syncedQ, setSyncedQ] = useState(query.q);
+  const [search, setSearch] = useSyncedState(query.q);
   const firstRender = useRef(true);
   const { data, isLoading, isError, refetch } = useJobsQuery(query);
   const { data: categories } = useCategories();
-
-  // Reset the local search box when filters.q changes externally (e.g. a "clear filters"
-  // click or browser back/forward) — adjusting state during render, not in an effect.
-  if (query.q !== syncedQ) {
-    setSyncedQ(query.q);
-    setSearch(query.q);
-  }
 
   // Debounced search → filters
   useEffect(() => {

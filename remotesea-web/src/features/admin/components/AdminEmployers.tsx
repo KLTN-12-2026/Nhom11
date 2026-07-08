@@ -1,10 +1,10 @@
 import { memo, useCallback, useState } from "react";
 import { Briefcase, Building, Search, Shield, Wallet } from "lucide-react";
-import { useToast } from "@/components/ui/toast";
 import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
 import { EmptyRow } from "@/components/shared/EmptyRow";
 import { PillToggle } from "@/components/shared/PillToggle";
-import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
+import { CompanyLogo } from "@/components/ui/company-logo";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
 import type { AdminEmployer } from "@/types/admin";
@@ -36,7 +36,11 @@ const EmployerRow = memo(function EmployerRow({
       style={{ gridTemplateColumns: "1fr 90px 140px 100px 32px" }}
     >
       <div className="flex items-center gap-3">
-        <CompanyInitial color={colorFor(e.companyName)} name={e.companyName} />
+        <CompanyLogo
+          color={colorFor(e.companyName)}
+          initial={e.companyName.charAt(0).toUpperCase()}
+          size={38}
+        />
         <div>
           <div className="flex items-center gap-1.5 text-[14px] font-semibold text-neutral-900">
             {e.companyName}
@@ -55,7 +59,10 @@ const EmployerRow = memo(function EmployerRow({
           ${(e.totalSpend / CENTS_PER_DOLLAR).toLocaleString()}
         </div>
         <div className="h-1 overflow-hidden rounded-full bg-neutral-100">
-          <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }} />
+          <div
+            className="h-full rounded-full bg-brand-600"
+            style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }}
+          />
         </div>
       </div>
       <span className="text-[13px] text-neutral-400">
@@ -85,7 +92,7 @@ const EmployerRow = memo(function EmployerRow({
 });
 
 export const AdminEmployers = () => {
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const { data, isLoading } = useAdminEmployers();
   const updateEmployerMutation = useUpdateAdminEmployer();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
@@ -95,18 +102,13 @@ export const AdminEmployers = () => {
 
   const { mutateAsync: updateEmployer } = updateEmployerMutation;
   const updateEmployerStatus = useCallback(
-    async (id: string, action: "verify" | "suspend") => {
-      try {
-        await updateEmployer({ id, action });
-        toast({
-          variant: action === "verify" ? "success" : "info",
-          title: action === "verify" ? "Employer verified" : "Employer suspended",
-        });
-      } catch {
-        toast({ variant: "error", title: "Couldn't update employer" });
-      }
-    },
-    [updateEmployer, toast]
+    (id: string, action: "verify" | "suspend") =>
+      runWithToast(() => updateEmployer({ id, action }), {
+        success: action === "verify" ? "Employer verified" : "Employer suspended",
+        successVariant: action === "verify" ? "success" : "info",
+        error: "Couldn't update employer",
+      }),
+    [updateEmployer, runWithToast]
   );
 
   const rows = employers.filter((e) => {
@@ -115,7 +117,10 @@ export const AdminEmployers = () => {
     return true;
   });
 
-  const counts = { all: employers.length, unverified: employers.filter((e) => !e.isVerified).length };
+  const counts = {
+    all: employers.length,
+    unverified: employers.filter((e) => !e.isVerified).length,
+  };
   const totalSpendCents = employers.reduce((a, e) => a + e.totalSpend, 0);
   const totalListings = employers.reduce((a, e) => a + e.jobCount, 0);
   const maxSpend = Math.max(1, ...employers.map((e) => e.totalSpend));
@@ -125,7 +130,9 @@ export const AdminEmployers = () => {
   return (
     <div className="flex-1 overflow-hidden">
       <div className="mb-6">
-        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Operations</p>
+        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+          Operations
+        </p>
         <h1 className="text-[26px] font-semibold text-neutral-900">Employers</h1>
         <p className="mt-1 text-sm text-neutral-500">
           {employers.length} companies · {totalListings} total listings · $
@@ -136,8 +143,19 @@ export const AdminEmployers = () => {
       {/* KPIs */}
       <div className="mb-6 grid grid-cols-3 gap-3">
         {[
-          { icon: <Building size={14} />, label: "Total employers", val: employers.length, sub: "all time" },
-          { icon: <Shield size={14} />, label: "Unverified", val: counts.unverified, sub: "need review", warn: counts.unverified > 0 },
+          {
+            icon: <Building size={14} />,
+            label: "Total employers",
+            val: employers.length,
+            sub: "all time",
+          },
+          {
+            icon: <Shield size={14} />,
+            label: "Unverified",
+            val: counts.unverified,
+            sub: "need review",
+            warn: counts.unverified > 0,
+          },
           {
             icon: <Wallet size={14} />,
             label: "Total billed",
@@ -149,7 +167,11 @@ export const AdminEmployers = () => {
             <div className="mb-2 flex items-center gap-1.5 text-[12px] text-neutral-400">
               {s.icon} {s.label}
             </div>
-            <div className={`text-[22px] font-semibold ${s.warn ? "text-amber-600" : "text-neutral-900"}`}>{s.val}</div>
+            <div
+              className={`text-[22px] font-semibold ${s.warn ? "text-amber-600" : "text-neutral-900"}`}
+            >
+              {s.val}
+            </div>
             <div className="mt-0.5 text-[11px] text-neutral-400">{s.sub}</div>
           </div>
         ))}
@@ -167,11 +189,16 @@ export const AdminEmployers = () => {
               key={f.id}
               onClick={() => setFilter(f.id)}
             >
-              {f.label} <span className={`ml-1 text-[11px] ${filter === f.id ? "text-white/70" : "text-neutral-400"}`}>{counts[f.id]}</span>
+              {f.label}{" "}
+              <span
+                className={`ml-1 text-[11px] ${filter === f.id ? "text-white/70" : "text-neutral-400"}`}
+              >
+                {counts[f.id]}
+              </span>
             </PillToggle>
           ))}
         </div>
-        <div className="ml-auto flex h-9 items-center gap-2 rounded-10 border border-neutral-200 bg-white px-3">
+        <div className="rounded-10 ml-auto flex h-9 items-center gap-2 border border-neutral-200 bg-white px-3">
           <Search className="text-neutral-400" size={14} />
           <input
             aria-label="Search employers"

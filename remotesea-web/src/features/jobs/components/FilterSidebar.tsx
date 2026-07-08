@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { Check } from "lucide-react";
 import { cn } from "@/utils/cn";
+import { useSyncedState } from "@/hooks/useSyncedState";
 import { useCategories } from "@/features/taxonomy/taxonomy.queries";
 import {
   DEFAULT_FILTERS,
@@ -90,17 +90,10 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
   };
 
   // Local salary state so dragging the sliders doesn't refetch per step; commit on release.
-  const [salary, setSalary] = useState({ min: filters.salaryMin, max: filters.salaryMax });
-  const [syncedSalary, setSyncedSalary] = useState({ min: filters.salaryMin, max: filters.salaryMax });
+  const [salaryMin, setSalaryMin] = useSyncedState(filters.salaryMin);
+  const [salaryMax, setSalaryMax] = useSyncedState(filters.salaryMax);
 
-  // Reset local salary state when filters change externally (e.g. "clear filters") —
-  // adjusting state during render, not in an effect, mirroring the search-sync pattern in JobsBoard.
-  if (filters.salaryMin !== syncedSalary.min || filters.salaryMax !== syncedSalary.max) {
-    setSyncedSalary({ min: filters.salaryMin, max: filters.salaryMax });
-    setSalary({ min: filters.salaryMin, max: filters.salaryMax });
-  }
-
-  const commitSalary = () => onChange({ ...filters, salaryMin: salary.min, salaryMax: salary.max });
+  const commitSalary = () => onChange({ ...filters, salaryMin, salaryMax });
 
   const slugForCategoryName = (name: string) => categories?.find((c) => c.name === name)?.slug;
 
@@ -152,10 +145,10 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
       <FilterGroup label="Salary range">
         <div className="space-y-2 pt-1">
           <div className="flex justify-between text-[12px] text-neutral-500">
-            <span>${salary.min.toLocaleString()}</span>
+            <span>${salaryMin.toLocaleString()}</span>
             <span>
-              ${salary.max.toLocaleString()}
-              {salary.max >= SALARY_CEIL ? "+" : ""}/mo
+              ${salaryMax.toLocaleString()}
+              {salaryMax >= SALARY_CEIL ? "+" : ""}/mo
             </span>
           </div>
           <input
@@ -165,8 +158,8 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
             min={SALARY_FLOOR}
             step={SALARY_STEP}
             type="range"
-            value={salary.min}
-            onChange={(e) => setSalary((s) => ({ ...s, min: Math.min(+e.target.value, s.max - SALARY_GAP) }))}
+            value={salaryMin}
+            onChange={(e) => setSalaryMin(Math.min(+e.target.value, salaryMax - SALARY_GAP))}
             onKeyUp={commitSalary}
             onMouseUp={commitSalary}
             onTouchEnd={commitSalary}
@@ -178,8 +171,8 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
             min={SALARY_FLOOR}
             step={SALARY_STEP}
             type="range"
-            value={salary.max}
-            onChange={(e) => setSalary((s) => ({ ...s, max: Math.max(+e.target.value, s.min + SALARY_GAP) }))}
+            value={salaryMax}
+            onChange={(e) => setSalaryMax(Math.max(+e.target.value, salaryMin + SALARY_GAP))}
             onKeyUp={commitSalary}
             onMouseUp={commitSalary}
             onTouchEnd={commitSalary}

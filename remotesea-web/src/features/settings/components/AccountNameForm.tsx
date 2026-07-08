@@ -1,6 +1,6 @@
 import { useForm } from "react-hook-form";
-import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { useUpdateMyName } from "@/features/users/users.queries";
 
 interface AccountNameFormValues {
@@ -9,7 +9,7 @@ interface AccountNameFormValues {
 
 export const AccountNameForm = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const updateNameMutation = useUpdateMyName();
 
   const {
@@ -18,15 +18,14 @@ export const AccountNameForm = () => {
     formState: { isSubmitting, isDirty },
   } = useForm<AccountNameFormValues>({ defaultValues: { name: user?.name ?? "" } });
 
-  const onSubmit = async (values: AccountNameFormValues) => {
+  const onSubmit = (values: AccountNameFormValues) => {
     const trimmedName = values.name.trim();
     if (!trimmedName) return;
-    try {
-      await updateNameMutation.mutateAsync(trimmedName);
-      toast({ variant: "success", title: "Name updated" });
-    } catch {
-      toast({ variant: "error", title: "Couldn't update name", description: "Please try again." });
-    }
+    return runWithToast(() => updateNameMutation.mutateAsync(trimmedName), {
+      success: "Name updated",
+      error: "Couldn't update name",
+      errorDescription: "Please try again.",
+    });
   };
 
   return (

@@ -1,5 +1,5 @@
-import { useToast } from "@/components/ui/toast";
 import { EmptyRow } from "@/components/shared/EmptyRow";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { AlertListItem } from "@/features/alerts/components/AlertListItem";
 import { CreateAlertForm } from "@/features/alerts/components/CreateAlertForm";
 import {
@@ -11,37 +11,29 @@ import {
 import type { CreateAlertPayload, JobAlert } from "@/types/alert";
 
 export const AlertsManager = () => {
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const { data: alerts, isLoading } = useAlerts();
   const createAlertMutation = useCreateAlert();
   const setActiveMutation = useSetAlertActive();
   const deleteAlertMutation = useDeleteAlert();
 
-  const handleCreate = async (payload: CreateAlertPayload) => {
-    try {
-      await createAlertMutation.mutateAsync(payload);
-      toast({ variant: "success", title: "Alert created", description: "We'll email you matching jobs." });
-    } catch {
-      toast({ variant: "error", title: "Couldn't create alert" });
-    }
-  };
+  const handleCreate = (payload: CreateAlertPayload) =>
+    runWithToast(() => createAlertMutation.mutateAsync(payload), {
+      success: "Alert created",
+      successDescription: "We'll email you matching jobs.",
+      error: "Couldn't create alert",
+    });
 
-  const handleToggleActive = async (alert: JobAlert) => {
-    try {
-      await setActiveMutation.mutateAsync({ id: alert.id, isActive: !alert.isActive });
-    } catch {
-      toast({ variant: "error", title: "Couldn't update alert" });
-    }
-  };
+  const handleToggleActive = (alert: JobAlert) =>
+    runWithToast(() => setActiveMutation.mutateAsync({ id: alert.id, isActive: !alert.isActive }), {
+      error: "Couldn't update alert",
+    });
 
-  const handleDelete = async (alert: JobAlert) => {
-    try {
-      await deleteAlertMutation.mutateAsync(alert.id);
-      toast({ variant: "success", title: "Alert deleted" });
-    } catch {
-      toast({ variant: "error", title: "Couldn't delete alert" });
-    }
-  };
+  const handleDelete = (alert: JobAlert) =>
+    runWithToast(() => deleteAlertMutation.mutateAsync(alert.id), {
+      success: "Alert deleted",
+      error: "Couldn't delete alert",
+    });
 
   return (
     <div className="mx-auto max-w-[820px] px-6 py-10">

@@ -1,8 +1,8 @@
 import { memo } from "react";
 import { Clock } from "lucide-react";
-import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
+import { CompanyLogo } from "@/components/ui/company-logo";
 import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
-import { hoursSince, waitCls, waitFmt } from "@/features/admin/admin.utils";
+import { colorFor, hoursSince, waitCls, waitFmt } from "@/features/admin/admin.utils";
 import type { AdminJob } from "@/types/admin";
 
 interface QueueListPaneProps {
@@ -23,7 +23,11 @@ const QueueListRow = memo(function QueueListRow({ job: j, selected, onSelect }: 
       className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-neutral-50 ${selected ? "bg-brand-50" : ""}`}
       onClick={() => onSelect(j.id)}
     >
-      <CompanyInitial name={j.employer.companyName} size={34} />
+      <CompanyLogo
+        color={colorFor(j.employer.companyName)}
+        initial={j.employer.companyName.charAt(0).toUpperCase()}
+        size={34}
+      />
       <div className="min-w-0 flex-1">
         <div className="text-[12px] font-semibold text-neutral-700">{j.employer.companyName}</div>
         <div className="truncate text-[13px] font-medium text-neutral-900">{j.title}</div>

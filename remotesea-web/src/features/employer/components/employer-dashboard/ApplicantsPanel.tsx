@@ -1,8 +1,8 @@
 import { memo, useCallback, useState } from "react";
 import { Check, X } from "lucide-react";
 import { cn } from "@/utils/cn";
-import { useToast } from "@/components/ui/toast";
 import { EmptyRow } from "@/components/shared/EmptyRow";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { useUpdateApplicationStatus } from "@/features/employer/employer.queries";
 import {
   APPLICANT_STATUS,
@@ -101,7 +101,7 @@ interface ApplicantsPanelProps {
 }
 
 export const ApplicantsPanel = ({ applicants }: ApplicantsPanelProps) => {
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const updateStatusMutation = useUpdateApplicationStatus();
   const [tab, setTab] = useState<ApplicantTabId>("all");
 
@@ -118,18 +118,13 @@ export const ApplicantsPanel = ({ applicants }: ApplicantsPanelProps) => {
 
   const { mutateAsync: updateStatus } = updateStatusMutation;
   const updateApplicantStatus = useCallback(
-    async (id: string, status: ApplicationStatus) => {
-      try {
-        await updateStatus({ id, status });
-        toast({
-          variant: status === "REJECTED" ? "info" : "success",
-          title: status === "REJECTED" ? "Applicant rejected" : "Applicant advanced",
-        });
-      } catch {
-        toast({ variant: "error", title: "Couldn't update applicant" });
-      }
-    },
-    [updateStatus, toast]
+    (id: string, status: ApplicationStatus) =>
+      runWithToast(() => updateStatus({ id, status }), {
+        success: status === "REJECTED" ? "Applicant rejected" : "Applicant advanced",
+        successVariant: status === "REJECTED" ? "info" : "success",
+        error: "Couldn't update applicant",
+      }),
+    [updateStatus, runWithToast]
   );
 
   return (

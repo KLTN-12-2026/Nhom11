@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { useAdminJobs, useReviewAdminJob } from "@/features/admin/admin.queries";
 import { hoursSince, REVIEW_CHECKLIST, URGENT_WAIT_HOURS } from "@/features/admin/admin.utils";
 import { QueueKpis } from "@/features/admin/components/admin-queue/QueueKpis";
@@ -14,7 +14,7 @@ import { DecisionBar } from "@/features/admin/components/admin-queue/DecisionBar
 const RESOLUTION_BANNER_DISPLAY_MS = 1200;
 
 export const AdminQueue = () => {
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const { data, isLoading } = useAdminJobs("PENDING_REVIEW");
   const reviewJobMutation = useReviewAdminJob();
 
@@ -47,25 +47,26 @@ export const AdminQueue = () => {
     });
   };
 
-  const decide = async (kind: ResolutionKind) => {
+  const decide = (kind: ResolutionKind) => {
     if (!effectiveSelId) return;
     const decidedId = effectiveSelId;
     const action = kind === "approved" ? "approve" : "reject";
-    try {
-      await reviewJobMutation.mutateAsync({ id: decidedId, action, note: notes[decidedId] || undefined });
-      toast({
-        variant: kind === "approved" ? "success" : "info",
-        title: kind === "approved" ? "Job approved & published" : "Job sent back to employer",
-      });
-      setResolved((prev) => ({ ...prev, [decidedId]: kind }));
-      setBanner({ id: decidedId, kind });
-      setTimeout(() => {
-        setBanner(null);
-        setSelId(null);
-      }, RESOLUTION_BANNER_DISPLAY_MS);
-    } catch {
-      toast({ variant: "error", title: "Couldn't submit review" });
-    }
+    runWithToast(
+      async () => {
+        await reviewJobMutation.mutateAsync({ id: decidedId, action, note: notes[decidedId] || undefined });
+        setResolved((prev) => ({ ...prev, [decidedId]: kind }));
+        setBanner({ id: decidedId, kind });
+        setTimeout(() => {
+          setBanner(null);
+          setSelId(null);
+        }, RESOLUTION_BANNER_DISPLAY_MS);
+      },
+      {
+        success: kind === "approved" ? "Job approved & published" : "Job sent back to employer",
+        successVariant: kind === "approved" ? "success" : "info",
+        error: "Couldn't submit review",
+      }
+    );
   };
 
   if (isLoading) {

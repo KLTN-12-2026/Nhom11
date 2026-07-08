@@ -2,7 +2,7 @@ import { Check } from "lucide-react";
 import { Field, Input, Select, Textarea } from "@/features/post-job/components/form-primitives";
 import { SkillTagEditor } from "@/components/shared/SkillTagEditor";
 import { PillToggle } from "@/components/shared/PillToggle";
-import { useCategories } from "@/features/taxonomy/taxonomy.queries";
+import { useCategories, useSkills } from "@/features/taxonomy/taxonomy.queries";
 import {
   BENEFIT_OPTIONS,
   CURRENCY_OPTIONS,
@@ -17,6 +17,8 @@ import {
 
 export const StepRole = ({ form, set }: PostJobStepProps) => {
   const { data: categories } = useCategories();
+  const { data: allSkills } = useSkills();
+  const skillSuggestions = (allSkills ?? []).map((s) => s.name);
 
   return (
     <div className="space-y-6">
@@ -87,10 +89,18 @@ export const StepRole = ({ form, set }: PostJobStepProps) => {
       </Field>
 
       <Field label="Required skills">
-        <SkillTagEditor setSkills={(s) => set("jobSkills", s)} skills={form.jobSkills} />
+        <SkillTagEditor
+          setSkills={(s) => set("jobSkills", s)}
+          skills={form.jobSkills}
+          suggestions={skillSuggestions}
+        />
       </Field>
       <Field label="Nice-to-have skills">
-        <SkillTagEditor setSkills={(s) => set("jobNice", s)} skills={form.jobNice} />
+        <SkillTagEditor
+          setSkills={(s) => set("jobNice", s)}
+          skills={form.jobNice}
+          suggestions={skillSuggestions}
+        />
       </Field>
 
       <div className="border-t border-neutral-100 pt-5">

@@ -1,3 +1,4 @@
+import { pickColorFromString } from "@/utils/color";
 import type { AdminJob } from "@/types/admin";
 
 export const LEVEL_LABELS: Record<string, string> = {
@@ -23,11 +24,7 @@ export const PLAN_LABELS: Record<string, string> = {
 
 const COLORS = ["#16766F", "#0EA5E9", "#2563EB", "#7C3AED", "#2E9B52", "#EE4D2D", "#00B14F"];
 
-export const colorFor = (s: string): string => {
-  let hash = 0;
-  for (let i = 0; i < s.length; i += 1) hash += s.charCodeAt(i);
-  return COLORS[hash % COLORS.length];
-};
+export const colorFor = (s: string): string => pickColorFromString(s, COLORS);
 
 const MS_PER_HOUR = 3_600_000;
 const HOURS_PER_DAY = 24;
