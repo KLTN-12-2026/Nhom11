@@ -1,0 +1,208 @@
+# RemoteSea AI Service
+
+A self-hosted AI microservice for RemoteSea, independent from `remotesea-api`
+(NestJS) and `remotesea-web` (React) — see the architecture doc this was
+built from for the full 12-phase vision. **This README documents what's
+actually implemented right now, not the full vision** — see "Scope" below.
+
+The end-to-end target for this first slice is the full learning loop for one
+task only: `CANDIDATE_ANALYSIS` → `AiInteraction` → Accept/Edit/Reject
+feedback → Dataset Builder → `dataset-vN` → Google Colab QLoRA training →
+Evaluation → Candidate Model → human approval → Ollama deployment. Job
+Matching, Interview Analysis, Scorecard Analysis, and advanced RAG are
+explicitly out of scope until that loop works end-to-end.
+
+## Scope: what's built vs. what isn't
+
+Built and verified end-to-end, against a real running Postgres + Ollama
+stack (not just written — every item below has been exercised with real
+curl calls and DB queries):
+
+- FastAPI service, own PostgreSQL database (via SQLAlchemy async + Alembic),
+  shared-secret auth for NestJS → AI Service calls.
+- `AiModelProvider` abstraction with one real implementation (`OllamaProvider`,
+  running **Qwen2.5-3B-Instruct** locally, CPU-only). Swapping in a
+  `VLLMProvider` for production later means adding one class, not touching
+  any caller — see `app/providers/factory.py`.
+- `POST /v1/inference` for `task: "CANDIDATE_ANALYSIS"` — builds a prompt from
+  candidate/job/application context, calls the model, validates the response
+  against a strict Pydantic schema (`score`, `recommendation`, `strengths`,
+  `weaknesses`, `missingRequirements`, `reasoning`), persists it as an
+  `AiInteraction` (auditable: input, output, model version, latency, status,
+  never overwritten), returns the structured result.
+- `POST /v1/feedback` — a human records `ACCEPT` / `EDIT` / `REJECT` against
+  an `AiInteraction`, optionally with a `correctedOutput` (required for
+  `EDIT`) and a `reason`. Stored as an immutable `AiFeedback` row. **Never
+  triggers anything automatically** — no auto-training, no auto-dataset-build
+  — that's a hard rule from the architecture doc, enforced by construction:
+  `FeedbackService` only validates and persists, nothing else.
+- `POST /v1/datasets/build` and `GET /v1/datasets` — the Dataset Builder.
+  Joins each `AiInteraction` with its *latest* `AiFeedback`, keeps `ACCEPT`
+  (ground truth = the model's own output) and `EDIT` (ground truth = the
+  human's `correctedOutput`), drops `REJECT` and anything with no feedback at
+  all, validates the resulting ground truth against `CandidateAnalysisResult`
+  (so stale-schema or malformed data can't silently poison training),
+  deduplicates by input, splits 80/10/10 into train/validation/test, and
+  writes `datasets/candidate_analysis/v{N}/{train,validation,test}.jsonl` in
+  the exact `{"instruction", "input", "output"}` shape the training notebook
+  expects. Every build inserts a new `AiDataset` row and new files — an
+  existing version is never updated or overwritten (`dataset-v1` stays
+  `dataset-v1` forever, including a `FAILED` one from a build that found zero
+  valid samples). Explicitly invoked only — feedback volume never triggers a
+  build on its own.
+- `POST /v1/models`, `/complete-training`, `/evaluate`, `/approve`,
+  `/rollback`, `GET /v1/models`, `GET /v1/models/active` — the Model
+  Registry. One `AiModel` row per training attempt, status only ever moving
+  forward through `TRAINING → EVALUATING → CANDIDATE → ACTIVE → ARCHIVED`
+  (or off to `REJECTED` from `EVALUATING`); every mutating call checks the
+  row is in the expected prior state first and 409s otherwise. `approve`
+  enforces "exactly one ACTIVE row per task" by archiving the current active
+  model in the same transaction — never two ACTIVE rows, never a gap.
+  `rollback` only accepts a model that was previously ACTIVE (`deployedAt`
+  set, now `ARCHIVED`); rolling back to a model that was never deployed
+  (still `TRAINING`, `CANDIDATE`, or `REJECTED`) is rejected. Evaluation
+  pass/fail (`passed: true|false` on `/evaluate`) is supplied by the caller
+  — this service has no real model predictions to judge quality from without
+  Colab, so it records the decision rather than inventing a threshold.
+- `GET /health`.
+
+**Deliberately not built yet** (this is the honest gap, not an oversight):
+
+- Every other `AiTask` (JOB_MATCHING, INTERVIEW_ANALYSIS, SCORECARD_ANALYSIS,
+  INTERVIEW_QUESTION_GENERATION, KNOWLEDGE_ASSISTANT) — the enum exists, the
+  request schema accepts them, but `InferenceService.run` raises a clean 501
+  for anything except CANDIDATE_ANALYSIS, and the Dataset Builder raises
+  `UnsupportedDatasetTaskError` for anything else too. Out of scope until the
+  CANDIDATE_ANALYSIS loop works end-to-end (explicit instruction).
+- QLoRA training (`notebooks/qlora_training.ipynb`, Google Colab) and the
+  real Evaluation computation that would feed `/v1/models/{id}/evaluate` —
+  both need a trained model's actual predictions, which this environment
+  can't produce. Ollama deployment (Modelfile + merge script) — turning an
+  `AiModel.artifactPath` (a LoRA adapter) into something `ollama create` can
+  serve. RAG (pgvector/Qdrant), vLLM + production hardening. Also: nothing
+  currently makes `OllamaProvider` read `GET /v1/models/active` to pick which
+  model to serve — it still always uses the fixed `OLLAMA_MODEL` env var.
+  Wiring dynamic model selection into the provider is follow-up work once
+  there's an actual fine-tuned model to select.
+- **Why no local training**: this machine has no GPU. Per the architecture
+  doc's explicit hardware constraint, QLoRA/LoRA training must never run
+  locally — it's designed to run on Colab's GPU against the `train.jsonl`
+  this service produces, as a fully separate pipeline. Building the notebook
+  now would mean shipping code that's never actually been executed anywhere,
+  which is worse than not having it yet — it'll be built and the user will
+  need to run it on Colab themselves once there's a real dataset worth
+  training on.
+
+## Local setup
+
+Requires Docker (for Postgres) and Ollama running natively on the host — see
+below for why Ollama isn't containerized here.
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+cp .env.example .env   # then edit AI_SERVICE_SECRET to a real random value
+
+docker compose up -d postgres
+alembic upgrade head
+
+# Ollama runs on the host, not in Docker — the official ollama/ollama image
+# bundles NVIDIA CUDA libraries for GPU inference this machine can't use,
+# which is 10GB+ of dead weight (and what filled a disk-constrained dev VM
+# during initial setup). Install natively instead:
+#   macOS: https://ollama.com/download (or `brew install ollama`, which
+#   builds a large dependency tree from source on machines without a
+#   Homebrew bottle for the current OS — the .com installer avoids that).
+ollama serve &
+ollama pull qwen2.5:3b-instruct   # or whatever OLLAMA_MODEL is set to in .env
+
+uvicorn app.main:app --reload
+```
+
+Verify inference:
+
+```bash
+curl http://localhost:8000/health
+
+curl http://localhost:8000/v1/inference \
+  -X POST -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $(grep AI_SERVICE_SECRET .env | cut -d= -f2)" \
+  -d '{
+    "task": "CANDIDATE_ANALYSIS",
+    "userId": "user_123",
+    "applicationId": "application_123",
+    "context": {
+      "candidate": {"name": "Jane Doe", "skills": ["Node.js", "PostgreSQL"], "yearsExperience": 5},
+      "job": {"title": "Backend Engineer", "description": "Build APIs.", "level": "SENIOR"}
+    }
+  }'
+```
+
+On this dev machine (CPU-only, 3B model), a CANDIDATE_ANALYSIS call takes
+roughly 2–3 minutes. Production (vLLM + GPU) is expected to be far faster —
+nothing in the request/response contract changes when that swap happens.
+
+Verify feedback + dataset build (using the `interactionId` from the call
+above):
+
+```bash
+SECRET=$(grep AI_SERVICE_SECRET .env | cut -d= -f2)
+
+curl http://localhost:8000/v1/feedback \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"interactionId": "<id from above>", "userId": "user_123", "action": "ACCEPT"}'
+
+curl http://localhost:8000/v1/datasets/build \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"task": "CANDIDATE_ANALYSIS"}'
+
+curl "http://localhost:8000/v1/datasets?task=CANDIDATE_ANALYSIS" \
+  -H "Authorization: Bearer $SECRET"
+```
+
+Verify the model registry (normally driven by the Colab notebook + a human
+approver, faked here with a placeholder artifact path):
+
+```bash
+MODEL_ID=$(curl -s http://localhost:8000/v1/models \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"task": "CANDIDATE_ANALYSIS", "name": "candidate-analysis-lora-v1", "baseModel": "Qwen/Qwen2.5-3B-Instruct", "datasetVersion": 1}' \
+  | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+
+curl http://localhost:8000/v1/models/$MODEL_ID/complete-training \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"artifactPath": "/path/to/lora-adapter"}'
+
+curl http://localhost:8000/v1/models/$MODEL_ID/evaluate \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"metrics": {"taskAccuracy": 0.82}, "passed": true}'
+
+curl http://localhost:8000/v1/models/$MODEL_ID/approve \
+  -X POST -H "Authorization: Bearer $SECRET"
+
+curl "http://localhost:8000/v1/models/active?task=CANDIDATE_ANALYSIS" \
+  -H "Authorization: Bearer $SECRET"
+```
+
+## Tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+Covers pure logic only (prompt building, response parsing, feedback
+validation, dataset example selection/splitting) — no DB/HTTP integration
+tests yet, since those need a running Postgres + Ollama. Every DB/HTTP path
+has instead been verified manually against the real running stack (see
+commands above) each time it changed.
+
+## Talking to this service from NestJS
+
+Not wired up on the remotesea-api side yet. When it is: NestJS builds the
+`context` (candidate/job/application) from its own database — this service
+never queries remotesea-api's Postgres directly (see the architecture doc:
+"AI Service không tự truy cập database business của RemoteSea") — and calls
+`POST /v1/inference` with `Authorization: Bearer <AI_SERVICE_SECRET>`, the
+same secret configured in this service's `.env`.
