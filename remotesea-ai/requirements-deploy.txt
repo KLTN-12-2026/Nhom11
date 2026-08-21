@@ -1,0 +1,6 @@
+# Only for scripts/deploy_to_ollama.py's merge+convert stage — not needed to
+# run the FastAPI service itself (see requirements.txt), so kept out of it.
+torch==2.5.1
+transformers==4.47.1
+peft==0.14.0
+accelerate==1.2.1

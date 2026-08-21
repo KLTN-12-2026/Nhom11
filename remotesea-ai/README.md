@@ -74,16 +74,29 @@ curl calls and DB queries):
   for anything except CANDIDATE_ANALYSIS, and the Dataset Builder raises
   `UnsupportedDatasetTaskError` for anything else too. Out of scope until the
   CANDIDATE_ANALYSIS loop works end-to-end (explicit instruction).
-- QLoRA training (`notebooks/qlora_training.ipynb`, Google Colab) and the
-  real Evaluation computation that would feed `/v1/models/{id}/evaluate` —
-  both need a trained model's actual predictions, which this environment
-  can't produce. Ollama deployment (Modelfile + merge script) — turning an
-  `AiModel.artifactPath` (a LoRA adapter) into something `ollama create` can
-  serve. RAG (pgvector/Qdrant), vLLM + production hardening. Also: nothing
-  currently makes `OllamaProvider` read `GET /v1/models/active` to pick which
-  model to serve — it still always uses the fixed `OLLAMA_MODEL` env var.
-  Wiring dynamic model selection into the provider is follow-up work once
-  there's an actual fine-tuned model to select.
+- **`notebooks/qlora_training.ipynb`** exists (QLoRA fine-tune of
+  `Qwen/Qwen2.5-3B-Instruct` on `train.jsonl`, evaluate against `test.jsonl`,
+  save the adapter) but **has never been run** — this environment has no
+  GPU to run it against. Treat its hyperparameters as reasonable T4 defaults,
+  not verified ones, until someone runs it on Colab.
+- **`scripts/deploy_to_ollama.py`** (merge LoRA adapter → GGUF via llama.cpp
+  → `ollama create`) is split into two stages with different verification
+  status: the merge/convert/quantize stage needs torch/transformers/peft
+  (`requirements-deploy.txt`, deliberately kept out of the main service's
+  deps) and a built llama.cpp, and **has not been run** — no real adapter
+  exists yet to test it against. The Modelfile-render + `ollama create` stage
+  **has been run for real** (`--from-model qwen2.5:3b-instruct --skip-merge`,
+  then removed) — confirmed the rendered `SYSTEM` prompt matches
+  `_CANDIDATE_ANALYSIS_SYSTEM` exactly (single source of truth, no copy-paste
+  drift) and `ollama create` succeeds.
+- The real Evaluation computation that feeds `/v1/models/{id}/evaluate`
+  needs a trained model's actual predictions — the notebook's evaluation
+  cell computes it, but hasn't been run for the same no-GPU reason.
+- RAG (pgvector/Qdrant), vLLM + production hardening.
+- Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
+  pick which model to serve — it still always uses the fixed `OLLAMA_MODEL`
+  env var. Wiring dynamic model selection into the provider is follow-up
+  work once there's an actual fine-tuned model to select.
 - **Why no local training**: this machine has no GPU. Per the architecture
   doc's explicit hardware constraint, QLoRA/LoRA training must never run
   locally — it's designed to run on Colab's GPU against the `train.jsonl`
