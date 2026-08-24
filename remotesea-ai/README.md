@@ -106,6 +106,22 @@ curl calls and DB queries):
   documents ingested, two different natural-language questions each
   correctly ranked the relevant document first by cosine distance, with the
   unrelated document consistently ranked last.
+- **Context Builder + routing** (`POST /v1/orchestrator/ask`) — the first
+  endpoint that decides what to fetch rather than being told exactly what to
+  call: RAG retrieval always runs against the question; the `applicationId`
+  Tool only runs if the caller supplied one (a simple, disclosed rule, not
+  an LLM-driven intent classifier — see below). `context_builder.py` merges
+  user role/company + (optional) live application data + retrieved
+  knowledge + the question into one prompt with hard character caps per
+  section (`_MAX_LIVE_DATA_CHARS`/`_MAX_KNOWLEDGE_CHARS`), pure and
+  unit-tested. `sources` in the response is always computed from what this
+  service actually fetched, never taken from the model's own claims.
+  Verified live: a pure knowledge question answered correctly from RAG
+  alone; a question with a real `applicationId` correctly pulled that
+  application's live status via the Tool and grounded its answer in it; the
+  same question from a TALENT token (who can't access that Tool) correctly
+  got a 403 on the Tool call, caught, and still answered from RAG alone
+  rather than failing the whole request.
 
 **Deliberately not built yet** (this is the honest gap, not an oversight):
 
@@ -133,12 +149,15 @@ curl calls and DB queries):
 - The real Evaluation computation that feeds `/v1/models/{id}/evaluate`
   needs a trained model's actual predictions — the notebook's evaluation
   cell computes it, but hasn't been run for the same no-GPU reason.
-- The Orchestrator itself: intent routing, LLM-driven tool selection, the
-  Context Builder that merges RAG + tool results + AI history into one
-  bounded prompt, and AI Chat. Phases 1–3 (context forwarding, tools, RAG)
-  are the building blocks; nothing yet decides *when* to call a tool or
-  *what* to retrieve — every tool/RAG call so far has been invoked directly
-  for verification, not by an LLM. vLLM + production hardening.
+- **Real intent detection**: `/v1/orchestrator/ask`'s routing is a plain,
+  disclosed rule (RAG always, the application Tool only if an
+  `applicationId` was supplied), not an LLM deciding what it needs — the
+  doc's "Knowledge Question / Live Data Question / Complex Question / Pure
+  Conversation" classification is future work. AI History / case retrieval
+  (similar-past-cases-as-examples) isn't wired into `ask()` yet — it only
+  uses RAG + the one optional Tool right now. AI Chat (a conversation with
+  turns, not one-shot `ask()`) and the remotesea-web UI for any of this.
+  vLLM + production hardening.
 - Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
   pick which model to serve — it still always uses the fixed `OLLAMA_MODEL`
   env var. Wiring dynamic model selection into the provider is follow-up
@@ -275,6 +294,15 @@ one via `AiOrchestratorService.mintContextToken`):
 ```bash
 curl http://localhost:8000/v1/orchestrator/health -H "Authorization: Bearer <orchestrator-context-token>"
 curl http://localhost:8000/v1/orchestrator/tools/applications/<id> -H "Authorization: Bearer <orchestrator-context-token>"
+
+curl http://localhost:8000/v1/orchestrator/ask \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <orchestrator-context-token>" \
+  -d '{"question": "Can an employer reschedule a confirmed interview?"}'
+
+# With page context — pulls that application's live data as a Tool call too:
+curl http://localhost:8000/v1/orchestrator/ask \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer <orchestrator-context-token>" \
+  -d '{"question": "What is the status of this application?", "applicationId": "<id>"}'
 ```
 
 ## Tests

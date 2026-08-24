@@ -11,7 +11,14 @@ from app.core.database import Base
 # autogenerate compares against it — a model that exists in app/models/ but
 # is never imported here would silently be invisible to `alembic revision
 # --autogenerate`.
-from app.models import ai_dataset, ai_feedback, ai_interaction, ai_model  # noqa: F401
+from app.models import (  # noqa: F401
+    ai_conversation,
+    ai_conversation_turn,
+    ai_dataset,
+    ai_feedback,
+    ai_interaction,
+    ai_model,
+)
 
 config = context.config
 if config.config_file_name is not None:
