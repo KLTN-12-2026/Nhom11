@@ -9,8 +9,15 @@ The end-to-end target for this first slice is the full learning loop for one
 task only: `CANDIDATE_ANALYSIS` → `AiInteraction` → Accept/Edit/Reject
 feedback → Dataset Builder → `dataset-vN` → Google Colab QLoRA training →
 Evaluation → Candidate Model → human approval → Ollama deployment. Job
-Matching, Interview Analysis, Scorecard Analysis, and advanced RAG are
-explicitly out of scope until that loop works end-to-end.
+Matching, Interview Analysis, and Scorecard Analysis are explicitly out of
+scope until that loop works end-to-end.
+
+Alongside that loop, this service is also becoming the **AI Orchestrator**
+for a separate, later-stage architecture: RemoteSea's real domain model,
+authorization, and business logic live in `remotesea-api` (NestJS) —
+this service never duplicates them, only calls back into `remotesea-api`'s
+own authenticated HTTP API as "Tools," and holds its own RAG knowledge base
+independently. See "AI Orchestrator" below for what's built there.
 
 ## Scope: what's built vs. what isn't
 
@@ -66,6 +73,40 @@ curl calls and DB queries):
   Colab, so it records the decision rather than inventing a threshold.
 - `GET /health`.
 
+### AI Orchestrator (Phases 1–3, verified live against both real services)
+
+- **Context forwarding** (`require_orchestrator_context`, `/v1/orchestrator/health`) —
+  remotesea-api mints a short-lived HS256 JWT per request (`AiOrchestratorService.
+  mintContextToken`, signed with the same `AI_SERVICE_SECRET`) carrying the
+  calling user's id/role/company membership (resolved through remotesea-api's
+  own `CompanyMembershipService`, not re-derived here). This service verifies
+  it, never trusts an unsigned identity. Round-trip verified live for both
+  TALENT and EMPLOYER (with real `employerId`/`companyRole`) against a real
+  Supabase-backed remotesea-api instance.
+- **Tools** (`/v1/orchestrator/tools/applications/{id}`, `/candidate-analysis`,
+  `/interview`, `/jobs/{id}`) — this service never queries remotesea-api's
+  database or re-implements its authorization; each tool forwards the exact
+  bearer token it received to a dedicated remotesea-api route
+  (`GET /ai-orchestrator/tools/...`) guarded by the *same* `ApplicationAccessGuard`/
+  `RolesGuard` classes real browser requests go through. Verified live: an
+  owning employer gets data, a wrong-role caller gets 403, a
+  different-company employer gets 403 (cross-tenant isolation), and a real
+  business error (no résumé uploaded) propagates through unmodified rather
+  than becoming an opaque 500.
+- **RAG** (`POST /v1/rag/documents`, `GET /v1/rag/documents`,
+  `POST /v1/rag/search`) — its own database (`remotesea_rag`, a second
+  database on the same Postgres server as `remotesea_ai`, per the explicit
+  decision to keep knowledge-base storage independent from the Learning
+  Loop's tables), pgvector for storage/similarity search, `EmbeddingProvider`
+  abstraction (`app/providers/embedding_base.py`) with a real
+  `OllamaEmbeddingProvider` (`nomic-embed-text`, 768-dim) and a
+  `MockEmbeddingProvider` for tests. Ingestion chunks on paragraph/sentence
+  boundaries with overlap (`app/services/chunker.py`, pure/unit-tested) and
+  embeds in one batched call. Verified live: three real RemoteSea policy
+  documents ingested, two different natural-language questions each
+  correctly ranked the relevant document first by cosine distance, with the
+  unrelated document consistently ranked last.
+
 **Deliberately not built yet** (this is the honest gap, not an oversight):
 
 - Every other `AiTask` (JOB_MATCHING, INTERVIEW_ANALYSIS, SCORECARD_ANALYSIS,
@@ -92,7 +133,12 @@ curl calls and DB queries):
 - The real Evaluation computation that feeds `/v1/models/{id}/evaluate`
   needs a trained model's actual predictions — the notebook's evaluation
   cell computes it, but hasn't been run for the same no-GPU reason.
-- RAG (pgvector/Qdrant), vLLM + production hardening.
+- The Orchestrator itself: intent routing, LLM-driven tool selection, the
+  Context Builder that merges RAG + tool results + AI history into one
+  bounded prompt, and AI Chat. Phases 1–3 (context forwarding, tools, RAG)
+  are the building blocks; nothing yet decides *when* to call a tool or
+  *what* to retrieve — every tool/RAG call so far has been invoked directly
+  for verification, not by an LLM. vLLM + production hardening.
 - Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
   pick which model to serve — it still always uses the fixed `OLLAMA_MODEL`
   env var. Wiring dynamic model selection into the provider is follow-up
@@ -121,6 +167,14 @@ cp .env.example .env   # then edit AI_SERVICE_SECRET to a real random value
 docker compose up -d postgres
 alembic upgrade head
 
+# RAG's database is a second database on this same Postgres server, created
+# once by hand (the pgvector/pgvector:pg16 image bundles the extension, but
+# CREATE DATABASE + CREATE EXTENSION only need to run once — they don't
+# happen automatically against an existing data volume):
+docker exec -i $(docker compose ps -q postgres) psql -U ai_service -d postgres -c "CREATE DATABASE remotesea_rag;"
+docker exec -i $(docker compose ps -q postgres) psql -U ai_service -d remotesea_rag -c "CREATE EXTENSION vector;"
+alembic -c alembic_rag.ini upgrade head
+
 # Ollama runs on the host, not in Docker — the official ollama/ollama image
 # bundles NVIDIA CUDA libraries for GPU inference this machine can't use,
 # which is 10GB+ of dead weight (and what filled a disk-constrained dev VM
@@ -130,6 +184,7 @@ alembic upgrade head
 #   Homebrew bottle for the current OS — the .com installer avoids that).
 ollama serve &
 ollama pull qwen2.5:3b-instruct   # or whatever OLLAMA_MODEL is set to in .env
+ollama pull nomic-embed-text      # RAG's embedding model
 
 uvicorn app.main:app --reload
 ```
@@ -199,6 +254,29 @@ curl "http://localhost:8000/v1/models/active?task=CANDIDATE_ANALYSIS" \
   -H "Authorization: Bearer $SECRET"
 ```
 
+Verify RAG (self-contained — doesn't need remotesea-api running):
+
+```bash
+curl http://localhost:8000/v1/rag/documents \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"title": "Interview Scheduling Policy", "source": "interview-guidelines", "content": "..."}'
+
+curl http://localhost:8000/v1/rag/search \
+  -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $SECRET" \
+  -d '{"query": "Can an employer reschedule a confirmed interview?", "topK": 3}'
+```
+
+Verify the AI Orchestrator's context-forwarding and Tools (needs
+remotesea-api running too, and a real user JWT — the health check mints its
+own token internally, the individual tool endpoints below expect one already
+minted for you to forward; see remotesea-api's own README for how it mints
+one via `AiOrchestratorService.mintContextToken`):
+
+```bash
+curl http://localhost:8000/v1/orchestrator/health -H "Authorization: Bearer <orchestrator-context-token>"
+curl http://localhost:8000/v1/orchestrator/tools/applications/<id> -H "Authorization: Bearer <orchestrator-context-token>"
+```
+
 ## Tests
 
 ```bash
@@ -213,9 +291,18 @@ commands above) each time it changed.
 
 ## Talking to this service from NestJS
 
-Not wired up on the remotesea-api side yet. When it is: NestJS builds the
-`context` (candidate/job/application) from its own database — this service
-never queries remotesea-api's Postgres directly (see the architecture doc:
-"AI Service không tự truy cập database business của RemoteSea") — and calls
-`POST /v1/inference` with `Authorization: Bearer <AI_SERVICE_SECRET>`, the
-same secret configured in this service's `.env`.
+Two integration paths exist side by side:
+
+- **`CANDIDATE_ANALYSIS` inference/feedback/datasets/models** — not wired up
+  on the remotesea-api side yet. When it is: NestJS builds the `context`
+  (candidate/job/application) from its own database — this service never
+  queries remotesea-api's Postgres directly — and calls the corresponding
+  `/v1/...` endpoint with `Authorization: Bearer <AI_SERVICE_SECRET>`.
+- **The AI Orchestrator (context/tools/RAG)** — wired up and verified live.
+  remotesea-api's `AiOrchestratorModule` (`src/modules/ai-orchestrator/` in
+  that repo) mints a per-request context token and calls this service's
+  `/v1/orchestrator/...` routes; this service forwards that same token back
+  to remotesea-api's `/ai-orchestrator/tools/...` routes for Tool calls. Both
+  sides must have the identical `AI_SERVICE_SECRET` configured — it's the
+  legacy bearer secret on one set of routes and the JWT signing key on the
+  other, same value either way.

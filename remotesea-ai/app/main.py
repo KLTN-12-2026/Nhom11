@@ -5,6 +5,8 @@ from app.api.feedback import router as feedback_router
 from app.api.health import router as health_router
 from app.api.inference import router as inference_router
 from app.api.models import router as models_router
+from app.api.orchestrator import router as orchestrator_router
+from app.api.rag import router as rag_router
 from app.core.logging import configure_logging
 
 configure_logging()
@@ -22,3 +24,5 @@ app.include_router(inference_router)
 app.include_router(feedback_router)
 app.include_router(datasets_router)
 app.include_router(models_router)
+app.include_router(orchestrator_router)
+app.include_router(rag_router)
