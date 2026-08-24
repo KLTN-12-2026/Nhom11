@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.security import require_service_auth
+from app.application.feedback_service import FeedbackService, InteractionNotFoundError
+from app.infrastructure.main_db import get_db
+from app.infrastructure.security import require_service_auth
 from app.schemas.feedback import FeedbackRequest, FeedbackResponse
-from app.services.feedback_service import FeedbackService, InteractionNotFoundError
 
 router = APIRouter(
     prefix="/v1", tags=["feedback"], dependencies=[Depends(require_service_auth)]

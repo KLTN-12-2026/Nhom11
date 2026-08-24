@@ -1,23 +1,16 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
-
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.schemas.base import CamelModel, PermissiveCamelModel
 
 
-class ApplicationToolResult(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ApplicationToolResult(CamelModel):
     id: str
     status: str
     job: dict
     talent: dict
 
 
-class CandidateAnalysisToolResult(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class CandidateAnalysisToolResult(CamelModel):
     id: str
     application_id: str
     fit_score: int
@@ -34,9 +27,7 @@ class CandidateAnalysisToolResult(BaseModel):
 # the nested interview shape rather than a strict model — this tool wraps
 # InterviewsService.get() verbatim and shouldn't silently 500 on a field
 # this service hasn't independently verified byte-for-byte.
-class InterviewToolResult(BaseModel):
-    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="allow")
-
+class InterviewToolResult(PermissiveCamelModel):
     interview: dict | None
     job_title: str
     employer_name: str

@@ -19,6 +19,53 @@ this service never duplicates them, only calls back into `remotesea-api`'s
 own authenticated HTTP API as "Tools," and holds its own RAG knowledge base
 independently. See "AI Orchestrator" below for what's built there.
 
+## Architecture
+
+Clean Architecture, four layers, dependencies point inward only (`api` →
+`application` → `domain` ← `infrastructure`; `domain` never imports from any
+other layer):
+
+```
+app/
+├── main.py              # composition root — wires routers to the app
+├── api/                 # PRESENTATION — thin FastAPI routers, no business logic.
+│   ├── deps.py, health.py, inference.py, feedback.py, datasets.py,
+│   │   model_registry.py, rag.py
+│   └── orchestrator/    # health.py, tools.py, ask.py, chat.py — combined
+│                        # under one /v1/orchestrator router in __init__.py
+├── application/         # USE CASES — orchestrates domain + infrastructure.
+│   │                    # One service class per capability: inference,
+│   │                    # feedback, dataset_builder, model_registry,
+│   │                    # rag_ingestion, rag_retrieval, orchestrator, chat,
+│   │                    # tool_service, historical_case.
+├── domain/               # PURE business rules/value objects — zero I/O,
+│   │                    # zero framework imports, fully unit-testable.
+│   ├── candidate_analysis/  # prompt building, HistoricalCase, ground-truth selection
+│   ├── orchestrator/        # context_builder (ask/chat prompt assembly), HistoryTurn
+│   ├── dataset/              # example selection/splitting for the Dataset Builder
+│   ├── rag/                  # chunker, RetrievedChunk
+│   └── shared/                # truncate(), parse_json_object(), error_message() —
+│                              # small helpers used across the domain modules above
+├── infrastructure/       # DB, model/embedding providers, external HTTP, config, security
+│   ├── config.py, logging.py, security.py, database.py (generic engine/session
+│   │   factory), main_db.py, rag_db.py, remotesea_api_client.py
+│   ├── models/            # SQLAlchemy ORM (8 tables, 2 databases)
+│   └── providers/
+│       ├── llm/            # AiModelProvider: base/ollama/mock/factory
+│       └── embedding/      # EmbeddingProvider: base/ollama/mock/factory
+└── schemas/               # Pydantic request/response DTOs (API contract),
+                           # spans api+application; base.py's CamelModel kills
+                           # the repeated camelCase-alias boilerplate
+```
+
+Two independent Postgres databases, each with its own Alembic chain
+(`alembic/` for `remotesea_ai`, `alembic_rag/` for `remotesea_rag`) — see
+"Local setup" below. Swapping the LLM (Qwen → Llama/Mistral) or the inference
+runtime (Ollama → vLLM) means adding one class under
+`infrastructure/providers/llm/` and pointing `factory.py` at it — nothing in
+`application/` or `domain/` changes, since both only depend on the
+`AiModelProvider` interface in `providers/llm/base.py`.
+
 ## Scope: what's built vs. what isn't
 
 Built and verified end-to-end, against a real running Postgres + Ollama
@@ -30,7 +77,7 @@ curl calls and DB queries):
 - `AiModelProvider` abstraction with one real implementation (`OllamaProvider`,
   running **Qwen2.5-3B-Instruct** locally, CPU-only). Swapping in a
   `VLLMProvider` for production later means adding one class, not touching
-  any caller — see `app/providers/factory.py`.
+  any caller — see `app/infrastructure/providers/llm/factory.py`.
 - `POST /v1/inference` for `task: "CANDIDATE_ANALYSIS"` — builds a prompt from
   candidate/job/application context, calls the model, validates the response
   against a strict Pydantic schema (`score`, `recommendation`, `strengths`,
@@ -98,10 +145,10 @@ curl calls and DB queries):
   database on the same Postgres server as `remotesea_ai`, per the explicit
   decision to keep knowledge-base storage independent from the Learning
   Loop's tables), pgvector for storage/similarity search, `EmbeddingProvider`
-  abstraction (`app/providers/embedding_base.py`) with a real
+  abstraction (`app/infrastructure/providers/embedding/base.py`) with a real
   `OllamaEmbeddingProvider` (`nomic-embed-text`, 768-dim) and a
   `MockEmbeddingProvider` for tests. Ingestion chunks on paragraph/sentence
-  boundaries with overlap (`app/services/chunker.py`, pure/unit-tested) and
+  boundaries with overlap (`app/domain/rag/chunker.py`, pure/unit-tested) and
   embeds in one batched call. Verified live: three real RemoteSea policy
   documents ingested, two different natural-language questions each
   correctly ranked the relevant document first by cosine distance, with the
@@ -122,6 +169,52 @@ curl calls and DB queries):
   same question from a TALENT token (who can't access that Tool) correctly
   got a 403 on the Tool call, caught, and still answered from RAG alone
   rather than failing the whole request.
+- **AI Chat** (`POST/GET /v1/orchestrator/chat`, `GET /v1/orchestrator/chat/{id}`
+  — proxied through remotesea-api's `/ai-orchestrator/chat*`, and a real
+  `/ai-chat` page in remotesea-web) — multi-turn on top of `ask()`'s same
+  generation path (`OrchestratorService.generate`), persisted as
+  `AiConversation`/`AiConversationTurn` (in `remotesea_ai`, not
+  `remotesea_rag` — this is Learning Loop history, not knowledge-base
+  content), with the last 6 turns fed back in as a capped CONVERSATION
+  HISTORY section. Conversation ownership is checked against the JWT's own
+  `user_id`, never a client-supplied field. Verified live end-to-end
+  (browser → remotesea-web → remotesea-api → remotesea-ai → Ollama → back):
+  a follow-up question with no explicit reference to the prior turn's topic
+  answered correctly purely from conversation memory; a different user's
+  token got 404 on both reading and continuing someone else's conversation.
+  The remotesea-web UI itself was verified by compile/serve checks
+  (`tsc`, `eslint`, Vite module loading) only — this environment has no
+  working browser-automation tool (a real attempt with Playwright failed:
+  incompatible with this machine's macOS 13), so the actual rendered page
+  has not been visually confirmed; the user should check `/ai-chat` in a
+  real browser themselves before treating the UI as done.
+- **CANDIDATE_ANALYSIS is now grounded in RAG + historical cases**
+  (`application/historical_case_service.py`) — before building its prompt,
+  `InferenceService` retrieves relevant RAG chunks (query: job
+  title/level/requirements) and up to 3 similar past `CANDIDATE_ANALYSIS`
+  cases (matched on job title, latest-feedback-per-interaction, `REJECT`
+  excluded, ground truth validated against the current
+  `CandidateAnalysisResult` schema so a stale-shaped historical row can't
+  leak in). Historical cases carry **only the anonymized outcome**
+  (job title/level, score, recommendation, reasoning, and the human's
+  correction reason if any) — never the candidate's name/skills/resume,
+  since `AiInteraction` spans every company's candidates and this
+  service has no per-tenant scoping the way remotesea-api's guards do.
+  `AiInteraction.retrieved_context` now actually records what was
+  retrieved (`ragChunkIds`, `historicalCaseCount`) instead of always being
+  `null`. The external `POST /v1/inference` contract is unchanged — this is
+  purely an internal enrichment (`InferenceService` also works with
+  `rag_db`/`embedding_provider` omitted, e.g. in older tests). Two real bugs
+  hit and fixed while wiring this up: SQLAlchemy's generic `JSON` type
+  needs `.as_string()` for a LIKE match, not `.astext` (that's JSONB-only);
+  and — found only once real historical data with the *old* pre-Phase-3
+  output schema was queried — `AiInteraction.output`/`retrieved_context`
+  had the same "Python `None` stored as JSON `null` instead of SQL `NULL`"
+  bug already fixed on `AiFeedback.corrected_output`, now fixed here too
+  (existing bad rows corrected in place). Verified live: a real inference
+  call's persisted `retrieved_context` showed 2 real RAG chunk ids and
+  `historicalCaseCount: 1` — correctly excluding 2 other matching
+  interactions whose stored output used the old schema.
 
 **Deliberately not built yet** (this is the honest gap, not an oversight):
 
@@ -144,20 +237,21 @@ curl calls and DB queries):
   exists yet to test it against. The Modelfile-render + `ollama create` stage
   **has been run for real** (`--from-model qwen2.5:3b-instruct --skip-merge`,
   then removed) — confirmed the rendered `SYSTEM` prompt matches
-  `_CANDIDATE_ANALYSIS_SYSTEM` exactly (single source of truth, no copy-paste
-  drift) and `ollama create` succeeds.
+  `CANDIDATE_ANALYSIS_SYSTEM` (`app/domain/candidate_analysis/prompts.py`)
+  exactly (single source of truth, no copy-paste drift) and `ollama create`
+  succeeds.
 - The real Evaluation computation that feeds `/v1/models/{id}/evaluate`
   needs a trained model's actual predictions — the notebook's evaluation
   cell computes it, but hasn't been run for the same no-GPU reason.
-- **Real intent detection**: `/v1/orchestrator/ask`'s routing is a plain,
-  disclosed rule (RAG always, the application Tool only if an
+- **Real intent detection**: `/v1/orchestrator/ask` and `/chat`'s routing is
+  a plain, disclosed rule (RAG always, the application Tool only if an
   `applicationId` was supplied), not an LLM deciding what it needs — the
   doc's "Knowledge Question / Live Data Question / Complex Question / Pure
-  Conversation" classification is future work. AI History / case retrieval
-  (similar-past-cases-as-examples) isn't wired into `ask()` yet — it only
-  uses RAG + the one optional Tool right now. AI Chat (a conversation with
-  turns, not one-shot `ask()`) and the remotesea-web UI for any of this.
-  vLLM + production hardening.
+  Conversation" classification is future work. Case retrieval in `ask()`/
+  `chat()` (as opposed to CANDIDATE_ANALYSIS, which has it) still isn't
+  wired in — a chat question doesn't get grounded in similar past chat
+  turns the way a CANDIDATE_ANALYSIS call is now grounded in similar past
+  analyses. vLLM + production hardening.
 - Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
   pick which model to serve — it still always uses the fixed `OLLAMA_MODEL`
   env var. Wiring dynamic model selection into the provider is follow-up

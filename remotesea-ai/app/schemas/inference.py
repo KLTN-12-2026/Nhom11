@@ -1,20 +1,12 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
-from app.models.ai_interaction import AiTask
-
-# Every schema on this API boundary speaks camelCase (matching the doc's own
-# request/response examples, and remotesea-api/remotesea-web's convention on
-# the other side of the wire) while staying snake_case internally — populate_by_name
-# lets callers construct instances with either name in tests.
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.infrastructure.models.ai_interaction import AiTask
+from app.schemas.base import CamelModel
 
 
-class CandidateContext(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class CandidateContext(CamelModel):
     name: str | None = None
     headline: str | None = None
     bio: str | None = None
@@ -26,33 +18,25 @@ class CandidateContext(BaseModel):
     resume_text: str | None = None
 
 
-class JobContext(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class JobContext(CamelModel):
     title: str
     description: str
     requirements: str | None = None
     level: str | None = None
 
 
-class ApplicationContext(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ApplicationContext(CamelModel):
     cover_letter: str | None = None
     status: str | None = None
 
 
-class InferenceContext(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class InferenceContext(CamelModel):
     candidate: CandidateContext
     job: JobContext
     application: ApplicationContext | None = None
 
 
-class InferenceRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class InferenceRequest(CamelModel):
     task: AiTask
     user_id: str
     application_id: str | None = None
@@ -60,12 +44,10 @@ class InferenceRequest(BaseModel):
 
 
 # The structured output for CANDIDATE_ANALYSIS specifically — the only task
-# with a real prompt/parser right now (see inference_service.py). Every
-# other AiTask value is accepted by the request schema but rejected at the
-# service layer with a 501 until its own result schema + prompt exist.
-class CandidateAnalysisResult(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+# with a real prompt/parser right now (see application/inference_service.py).
+# Every other AiTask value is accepted by the request schema but rejected at
+# the service layer with a 501 until its own result schema + prompt exist.
+class CandidateAnalysisResult(CamelModel):
     score: int = Field(ge=0, le=100)
     recommendation: Literal["SHORTLIST", "REVIEW", "REJECT"]
     strengths: list[str] = Field(default_factory=list)
@@ -74,15 +56,11 @@ class CandidateAnalysisResult(BaseModel):
     reasoning: str
 
 
-class InferenceMetadata(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class InferenceMetadata(CamelModel):
     latency_ms: int
 
 
-class InferenceResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class InferenceResponse(CamelModel):
     interaction_id: str
     model_version: str
     result: dict[str, Any]

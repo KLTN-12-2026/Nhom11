@@ -4,14 +4,14 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.core.config import get_settings
-from app.core.database import Base
+from app.infrastructure.config import get_settings
+from app.infrastructure.main_db import Base
 
 # Import every model module so its table registers on Base.metadata before
-# autogenerate compares against it — a model that exists in app/models/ but
-# is never imported here would silently be invisible to `alembic revision
-# --autogenerate`.
-from app.models import (  # noqa: F401
+# autogenerate compares against it — a model that exists in
+# app/infrastructure/models/ but is never imported here would silently be
+# invisible to `alembic revision --autogenerate`.
+from app.infrastructure.models import (  # noqa: F401
     ai_conversation,
     ai_conversation_turn,
     ai_dataset,

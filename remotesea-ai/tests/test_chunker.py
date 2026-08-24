@@ -1,4 +1,4 @@
-from app.services.chunker import chunk_text
+from app.domain.rag.chunker import chunk_text
 
 
 class TestChunkText:

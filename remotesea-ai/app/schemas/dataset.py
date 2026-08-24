@@ -1,23 +1,15 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
-
-from app.models.ai_dataset import AiDatasetStatus
-from app.models.ai_interaction import AiTask
-
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.infrastructure.models.ai_dataset import AiDatasetStatus
+from app.infrastructure.models.ai_interaction import AiTask
+from app.schemas.base import CamelModel
 
 
-class BuildDatasetRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class BuildDatasetRequest(CamelModel):
     task: AiTask = AiTask.CANDIDATE_ANALYSIS
 
 
-class DatasetResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class DatasetResponse(CamelModel):
     id: str
     task: str
     version: int

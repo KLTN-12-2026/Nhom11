@@ -1,6 +1,6 @@
+from app.domain.orchestrator.context_builder import build_context
+from app.domain.rag.retrieved_chunk import RetrievedChunk
 from app.schemas.orchestrator import OrchestratorContext
-from app.services.context_builder import build_context
-from app.services.rag_retrieval_service import RetrievedChunk
 
 
 def _context(**overrides) -> OrchestratorContext:

@@ -1,14 +1,11 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.schemas.base import CamelModel
 
 
-class ChatRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ChatRequest(CamelModel):
     question: str = Field(min_length=1)
     application_id: str | None = None
     # Omitted -> starts a new conversation; provided -> continues an
@@ -17,18 +14,14 @@ class ChatRequest(BaseModel):
     conversation_id: str | None = None
 
 
-class ChatResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ChatResponse(CamelModel):
     conversation_id: str
     answer: str
     confidence: float = Field(ge=0.0, le=1.0)
     sources: list[str]
 
 
-class ConversationTurnResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ConversationTurnResponse(CamelModel):
     id: str
     question: str
     answer: str
@@ -38,9 +31,7 @@ class ConversationTurnResponse(BaseModel):
     created_at: datetime
 
 
-class ConversationSummaryResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ConversationSummaryResponse(CamelModel):
     id: str
     title: str
     created_at: datetime

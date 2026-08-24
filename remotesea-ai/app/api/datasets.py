@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.security import require_service_auth
-from app.models.ai_interaction import AiTask
+from app.application.dataset_builder import DatasetBuilder
+from app.infrastructure.main_db import get_db
+from app.infrastructure.models.ai_interaction import AiTask
+from app.infrastructure.security import require_service_auth
 from app.schemas.dataset import BuildDatasetRequest, DatasetResponse
-from app.services.dataset_builder import DatasetBuilder
 
 router = APIRouter(
     prefix="/v1/datasets", tags=["datasets"], dependencies=[Depends(require_service_auth)]

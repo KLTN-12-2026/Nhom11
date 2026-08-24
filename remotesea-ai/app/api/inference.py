@@ -1,21 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
-from app.core.security import require_service_auth
-from app.providers.base import AiModelProvider
-from app.providers.factory import get_provider
+from app.application.inference_service import InferenceService
+from app.infrastructure.main_db import get_db
+from app.infrastructure.providers.embedding.base import EmbeddingProvider
+from app.infrastructure.providers.embedding.factory import get_embedding_provider
+from app.infrastructure.providers.llm.base import AiModelProvider
+from app.infrastructure.providers.llm.factory import get_provider
+from app.infrastructure.rag_db import get_rag_db
+from app.infrastructure.security import require_service_auth
 from app.schemas.inference import InferenceRequest, InferenceResponse
-from app.services.inference_service import InferenceService
 
 router = APIRouter(prefix="/v1", tags=["inference"], dependencies=[Depends(require_service_auth)])
 
 
+# rag_db/embedding_provider wired in here so CANDIDATE_ANALYSIS can ground
+# its prompt in RAG knowledge + similar historical cases — InferenceService
+# still works without them (see its own comment), this is just where the
+# real dependencies get attached for the live endpoint.
 def _get_inference_service(
     db: AsyncSession = Depends(get_db),
     provider: AiModelProvider = Depends(get_provider),
+    rag_db: AsyncSession = Depends(get_rag_db),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
 ) -> InferenceService:
-    return InferenceService(db, provider)
+    return InferenceService(db, provider, rag_db, embedding_provider)
 
 
 @router.post("/inference", response_model=InferenceResponse)

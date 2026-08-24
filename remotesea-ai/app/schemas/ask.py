@@ -1,12 +1,9 @@
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.schemas.base import CamelModel
 
 
-class AskRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class AskRequest(CamelModel):
     question: str = Field(min_length=1)
     # Optional page context — e.g. the recruiter is asking about a specific
     # candidate while looking at that Application Workspace page. When
@@ -17,9 +14,7 @@ class AskRequest(BaseModel):
     application_id: str | None = None
 
 
-class AskResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class AskResponse(CamelModel):
     answer: str
     # The model's own self-reported confidence — a soft signal, not a
     # calibrated probability. Never trust it for an automated decision.
