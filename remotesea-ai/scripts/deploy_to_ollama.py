@@ -112,7 +112,7 @@ def create_ollama_model(model_name: str, from_source: str) -> None:
     subprocess.run(["ollama", "create", model_name, "-f", modelfile_path], check=True)
     print(f"Done. Deployed as Ollama model '{model_name}'.")
     print(
-        "Note: OllamaProvider still reads a fixed OLLAMA_MODEL from .env — "
+        "Note: OllamaProvider still reads a fixed AI_MODEL from .env — "
         "point it at this tag manually to actually serve it (see README's "
         "known-gap note on dynamic model selection)."
     )

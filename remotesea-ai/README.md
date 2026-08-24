@@ -51,7 +51,8 @@ app/
 │   │   factory), main_db.py, rag_db.py, remotesea_api_client.py
 │   ├── models/            # SQLAlchemy ORM (8 tables, 2 databases)
 │   └── providers/
-│       ├── llm/            # AiModelProvider: base/ollama/mock/factory
+│       ├── llm/            # AiModelProvider: base/ollama/anthropic/gemini/mock/
+│       │                   # factory/errors/retry
 │       └── embedding/      # EmbeddingProvider: base/ollama/mock/factory
 └── schemas/               # Pydantic request/response DTOs (API contract),
                            # spans api+application; base.py's CamelModel kills
@@ -60,11 +61,11 @@ app/
 
 Two independent Postgres databases, each with its own Alembic chain
 (`alembic/` for `remotesea_ai`, `alembic_rag/` for `remotesea_rag`) — see
-"Local setup" below. Swapping the LLM (Qwen → Llama/Mistral) or the inference
-runtime (Ollama → vLLM) means adding one class under
-`infrastructure/providers/llm/` and pointing `factory.py` at it — nothing in
-`application/` or `domain/` changes, since both only depend on the
-`AiModelProvider` interface in `providers/llm/base.py`.
+"Local setup" below. `application/` and `domain/` only ever depend on the
+`AiModelProvider` interface in `providers/llm/base.py`, never a concrete
+vendor — swapping models/vendors (`AI_PROVIDER`/`AI_MODEL`, see below) or
+adding a new one (a `VLLMProvider`, say) means adding/selecting one class
+under `infrastructure/providers/llm/`, not touching either layer.
 
 ## Scope: what's built vs. what isn't
 
@@ -74,10 +75,34 @@ curl calls and DB queries):
 
 - FastAPI service, own PostgreSQL database (via SQLAlchemy async + Alembic),
   shared-secret auth for NestJS → AI Service calls.
-- `AiModelProvider` abstraction with one real implementation (`OllamaProvider`,
-  running **Qwen2.5-3B-Instruct** locally, CPU-only). Swapping in a
-  `VLLMProvider` for production later means adding one class, not touching
-  any caller — see `app/infrastructure/providers/llm/factory.py`.
+- **`AiModelProvider` abstraction with three real implementations** —
+  `OllamaProvider` (default, self-hosted, running **Qwen2.5-3B-Instruct**
+  locally, CPU-only — zero API key needed), `AnthropicProvider`, and
+  `GeminiProvider`, selected via `AI_PROVIDER`/`AI_MODEL`
+  (`app/infrastructure/providers/llm/factory.py`). All three implemented
+  against raw `httpx` (no `anthropic`/`google-genai` SDK dependency added —
+  same reasoning `OllamaProvider` already followed) and share one retry
+  helper (`providers/llm/retry.py`: connection errors and 429/5xx retry up
+  to 3x with backoff, a 400/401 or a timeout does not — a timeout on
+  Ollama's CPU-only inference usually means "still generating," not
+  "transient") and one normalized error type (`AiProviderError`), instead
+  of each provider reimplementing that normalization. `json_schema`
+  (grammar-constrained structured output) is honored by each vendor's own
+  mechanism — Ollama's `format: <schema>`, Gemini's `responseSchema`/
+  `responseMimeType`, Anthropic's forced single-tool-use pattern (Claude has
+  no bare JSON-mode equivalent) — all three still return a plain string
+  from `complete()`, so nothing downstream (`parse_json_object`, every
+  caller) had to change. **Only `OllamaProvider` is live-verified** — no
+  Anthropic/Gemini API key exists in this environment; those two are
+  verified via unit tests on their pure request/response-shaping functions
+  (`tests/test_anthropic_provider.py`, `tests/test_gemini_provider.py`) and
+  built against each vendor's documented REST contract, not exercised
+  against a real network call. `AiModelProvider` also declares `stream()`
+  (all three implement it — Ollama's native NDJSON, Anthropic/Gemini's SSE)
+  but **nothing calls it yet** — every current endpoint needs a complete,
+  parseable JSON object, not partial text; built as available
+  infrastructure for a future streaming endpoint, same "capability exists,
+  not yet wired in" spirit as the rest of this section.
 - `POST /v1/inference` for `task: "CANDIDATE_ANALYSIS"` — builds a prompt from
   candidate/job/application context, calls the model, validates the response
   against a strict Pydantic schema (`score`, `recommendation`, `strengths`,
@@ -314,13 +339,14 @@ curl calls and DB queries):
   Data Question / Complex Question / Pure Conversation" classification
   (deciding whether to skip the LLM call entirely for something trivial) is
   still future work. No separate/smaller model for the classification call
-  either — it uses the same `OLLAMA_MODEL` as everything else; a real speed
+  either — it uses the same `AI_MODEL` as everything else; a real speed
   lever, not built yet since it adds a second model to configure/pull for a
   call that's already short. `ask()` (unlike `chat()`) still has no
   related-past-session grounding — it has no conversation identity to
-  anchor "past sessions" against. vLLM + production hardening.
+  anchor "past sessions" against. vLLM as a fourth provider (self-hosted,
+  GPU) + production hardening.
 - Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
-  pick which model to serve — it still always uses the fixed `OLLAMA_MODEL`
+  pick which model to serve — it still always uses the fixed `AI_MODEL`
   env var. Wiring dynamic model selection into the provider is follow-up
   work once there's an actual fine-tuned model to select.
 - **Why no local training**: this machine has no GPU. Per the architecture
@@ -363,7 +389,7 @@ alembic -c alembic_rag.ini upgrade head
 #   builds a large dependency tree from source on machines without a
 #   Homebrew bottle for the current OS — the .com installer avoids that).
 ollama serve &
-ollama pull qwen2.5:3b-instruct   # or whatever OLLAMA_MODEL is set to in .env
+ollama pull qwen2.5:3b-instruct   # or whatever AI_MODEL is set to in .env (Ollama path only)
 ollama pull nomic-embed-text      # RAG's embedding model
 
 uvicorn app.main:app --reload

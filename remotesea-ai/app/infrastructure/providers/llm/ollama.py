@@ -1,15 +1,11 @@
+import json
+from collections.abc import AsyncIterator
+
 import httpx
 
 from app.infrastructure.config import get_settings
 from app.infrastructure.providers.llm.base import AiModelProvider
-
-# CPU-only local inference (see README: no GPU in dev) is slow — generous
-# timeout so a real answer doesn't get cut off mid-generation on a small
-# machine, matching production's own eventual bound (vLLM/GPU) being far
-# faster in practice. Bumped from 180s after CANDIDATE_ANALYSIS's richer
-# output schema (5 fields incl. missingRequirements + reasoning, vs. the
-# original 4) pushed real generation time past that on this dev machine.
-REQUEST_TIMEOUT_SECONDS = 300.0
+from app.infrastructure.providers.llm.retry import with_retry
 
 
 class OllamaProvider(AiModelProvider):
@@ -21,41 +17,66 @@ class OllamaProvider(AiModelProvider):
     def __init__(self) -> None:
         settings = get_settings()
         self._base_url = settings.ollama_base_url
-        self._model = settings.ollama_model
+        self._model = settings.ai_model
         self._keep_alive = settings.ollama_keep_alive
-        self._client = httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS)
+        # CPU-only local inference (see README: no GPU in dev) is slow —
+        # ai_request_timeout_seconds is generous so a real answer doesn't
+        # get cut off mid-generation on a small machine, matching
+        # production's own eventual bound (vLLM/GPU) being far faster in
+        # practice.
+        self._client = httpx.AsyncClient(timeout=settings.ai_request_timeout_seconds)
 
     @property
     def model_version(self) -> str:
         return f"ollama:{self._model}"
 
+    def _payload(self, system: str, prompt: str, json_schema: dict | None, stream: bool) -> dict:
+        return {
+            "model": self._model,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": prompt},
+            ],
+            "stream": stream,
+            # A full JSON Schema here requests grammar-constrained
+            # decoding — Ollama cannot emit a field/type the schema
+            # doesn't allow (verified live against this model). Falls back
+            # to free-form "valid JSON, any shape" mode when the caller has
+            # no schema to enforce.
+            "format": json_schema if json_schema is not None else "json",
+            # Keeps the model resident in memory between requests —
+            # without this, Ollama's own (shorter) default unload window
+            # can evict it, and the next call pays a multi-second reload
+            # cost on top of generation time (observed live: a cold call's
+            # load_duration alone was ~15.8s).
+            "keep_alive": self._keep_alive,
+        }
+
     async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
-        response = await self._client.post(
-            f"{self._base_url}/api/chat",
-            json={
-                "model": self._model,
-                "messages": [
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-                "stream": False,
-                # A full JSON Schema here requests grammar-constrained
-                # decoding — Ollama cannot emit a field/type the schema
-                # doesn't allow (verified live against this model).
-                # Falls back to free-form "valid JSON, any shape" mode
-                # when the caller has no schema to enforce.
-                "format": json_schema if json_schema is not None else "json",
-                # Keeps the model resident in memory between requests —
-                # without this, Ollama's own (shorter) default unload
-                # window can evict it, and the next call pays a multi-
-                # second reload cost on top of generation time (observed
-                # live: a cold call's load_duration alone was ~15.8s).
-                "keep_alive": self._keep_alive,
-            },
-        )
-        response.raise_for_status()
-        data = response.json()
+        async def _call() -> dict:
+            response = await self._client.post(
+                f"{self._base_url}/api/chat",
+                json=self._payload(system, prompt, json_schema, stream=False),
+            )
+            response.raise_for_status()
+            return response.json()
+
+        data = await with_retry(_call)
         return data["message"]["content"]
+
+    async def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
+        payload = self._payload(system, prompt, json_schema=None, stream=True)
+        async with self._client.stream("POST", f"{self._base_url}/api/chat", json=payload) as response:
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line:
+                    continue
+                chunk = json.loads(line)
+                content = chunk.get("message", {}).get("content", "")
+                if content:
+                    yield content
+                if chunk.get("done"):
+                    break
 
     async def aclose(self) -> None:
         await self._client.aclose()

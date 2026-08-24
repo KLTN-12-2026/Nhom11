@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 
 
 # Every AI feature talks to this interface, never to a vendor/runtime SDK
 # directly — same reasoning as remotesea-api's AiService abstraction over
-# Anthropic/Gemini. Swapping OLLAMA for a VLLM- or TransformersProvider
-# later (or a different open-weight model — Qwen/Llama/Mistral) means
-# adding a new class here, not touching any caller.
+# Anthropic/Gemini. Swapping OLLAMA for ANTHROPIC/GEMINI (or a different
+# open-weight model — Qwen/Llama/Mistral) means adding/selecting a class
+# here (see factory.py's AI_PROVIDER switch), not touching any caller.
 class AiModelProvider(ABC):
     @property
     @abstractmethod
@@ -21,3 +22,12 @@ class AiModelProvider(ABC):
         providers that support it (guarantees the shape, not just valid
         JSON) — providers that don't support it may ignore it and fall back
         to free-form JSON mode."""
+
+    @abstractmethod
+    def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
+        """Yields incremental text chunks as they're generated. Not
+        schema-constrained (streaming + grammar-constrained decoding is not
+        how any of these providers' APIs compose) — prepared for a future
+        streaming endpoint; no current caller consumes this yet, since
+        every existing one (InferenceService, OrchestratorService) needs a
+        complete, parseable JSON object, not partial text."""

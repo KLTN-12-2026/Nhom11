@@ -14,9 +14,24 @@ class Settings(BaseSettings):
     # orchestrator context tokens remotesea-api mints (require_orchestrator_
     # context) — same value configured on both services, not two secrets.
     ai_service_secret: str
-    ai_model_provider: Literal["OLLAMA", "MOCK"] = "OLLAMA"
+    # AiModelProvider selection — see infrastructure/providers/llm/factory.py.
+    # OLLAMA is the default: self-hosted, zero API key, zero-config beyond
+    # what's already here. ANTHROPIC/GEMINI are opt-in alternatives, each
+    # requiring their own api key below.
+    ai_provider: Literal["OLLAMA", "ANTHROPIC", "GEMINI", "MOCK"] = "OLLAMA"
+    # Meaning depends on ai_provider: an Ollama tag, an Anthropic model id,
+    # or a Gemini model id. Defaults to today's Ollama default so switching
+    # provider is the only thing that changes for existing Ollama-only
+    # setups; picking ANTHROPIC/GEMINI requires setting this to a model that
+    # provider actually serves — not silently guessed per-provider.
+    ai_model: str = "qwen2.5:3b-instruct"
+    # Shared across all three providers — Ollama's CPU-only local inference
+    # is the slow case this was originally sized for; cloud providers
+    # (Anthropic/Gemini) finish well within it in practice.
+    ai_request_timeout_seconds: float = 300.0
+    anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:3b-instruct"
     # How long Ollama keeps the model loaded in memory after a request —
     # Ollama's own default is short enough that spaced-out requests can
     # trigger a multi-second reload on the next call (observed live:

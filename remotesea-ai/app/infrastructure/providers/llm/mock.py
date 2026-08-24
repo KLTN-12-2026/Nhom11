@@ -1,3 +1,5 @@
+from collections.abc import AsyncIterator
+
 from app.infrastructure.providers.llm.base import AiModelProvider
 
 
@@ -16,3 +18,6 @@ class MockProvider(AiModelProvider):
 
     async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
         return self._response
+
+    async def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
+        yield self._response
