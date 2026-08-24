@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from app.api.datasets import router as datasets_router
@@ -7,9 +9,31 @@ from app.api.inference import router as inference_router
 from app.api.model_registry import router as model_registry_router
 from app.api.orchestrator import router as orchestrator_router
 from app.api.rag import router as rag_router
+from app.infrastructure import remotesea_api_client
 from app.infrastructure.logging import configure_logging
+from app.infrastructure.providers.embedding.factory import get_embedding_provider
+from app.infrastructure.providers.llm.factory import get_provider
 
 configure_logging()
+
+
+# get_provider()/get_embedding_provider() are @lru_cache singletons holding
+# a persistent httpx.AsyncClient each (see infrastructure/providers/*/ollama.py)
+# — this closes those connections on shutdown, same for
+# remotesea_api_client's module-level client. MockProvider/
+# MockEmbeddingProvider hold no client, hence the getattr guard rather than
+# assuming every provider has aclose().
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    provider = get_provider()
+    if aclose := getattr(provider, "aclose", None):
+        await aclose()
+    embedding_provider = get_embedding_provider()
+    if aclose := getattr(embedding_provider, "aclose", None):
+        await aclose()
+    await remotesea_api_client.aclose()
+
 
 app = FastAPI(
     title="RemoteSea AI Service",
@@ -17,6 +41,7 @@ app = FastAPI(
     "RAG, feedback, dataset, training, evaluation, model registry, and the "
     "AI Orchestrator (see README.md for the phased rollout).",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 app.include_router(health_router)

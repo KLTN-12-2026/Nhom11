@@ -14,5 +14,5 @@ class MockProvider(AiModelProvider):
     def model_version(self) -> str:
         return "mock:static"
 
-    async def complete(self, system: str, prompt: str) -> str:
+    async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
         return self._response

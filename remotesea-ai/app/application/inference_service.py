@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.historical_case_service import HistoricalCaseService
 from app.application.rag_retrieval_service import RagRetrievalService
+from app.domain.candidate_analysis.consistency import check_score_recommendation_consistency
 from app.domain.candidate_analysis.historical_case import HistoricalCase
 from app.domain.candidate_analysis.prompt_builder import build_candidate_analysis_prompt
 from app.domain.candidate_analysis.prompts import CANDIDATE_ANALYSIS_SYSTEM
@@ -106,7 +107,9 @@ class InferenceService:
         raw_output: str | None = None
         try:
             prompt = build_candidate_analysis_prompt(request.context, rag_chunks, historical_cases)
-            raw_output = await self._provider.complete(CANDIDATE_ANALYSIS_SYSTEM, prompt)
+            raw_output = await self._provider.complete(
+                CANDIDATE_ANALYSIS_SYSTEM, prompt, json_schema=CandidateAnalysisResult.model_json_schema()
+            )
             parsed = parse_json_object(raw_output, CandidateAnalysisResult)
             if parsed is None:
                 raise ValueError("Model returned an unparseable response")
@@ -118,6 +121,17 @@ class InferenceService:
             parsed = None
             status = AiInteractionStatus.FAILED
             error = message
+
+        if parsed is not None:
+            consistency_warning = check_score_recommendation_consistency(
+                parsed.score, parsed.recommendation
+            )
+            if consistency_warning is not None:
+                logger.warning(
+                    "CANDIDATE_ANALYSIS score/recommendation looks inconsistent: %s",
+                    consistency_warning,
+                )
+                retrieved_context = {**(retrieved_context or {}), "consistencyWarning": True}
 
         latency_ms = int((time.monotonic() - started_at) * 1000)
         interaction = AiInteraction(

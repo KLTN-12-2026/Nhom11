@@ -14,6 +14,10 @@ class AiModelProvider(ABC):
         specific enough to tell two different models/checkpoints apart."""
 
     @abstractmethod
-    async def complete(self, system: str, prompt: str) -> str:
+    async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
         """Raw text completion — prompt construction and response parsing
-        are the caller's job (application layer), not this layer's."""
+        are the caller's job (application layer), not this layer's.
+        json_schema, when given, requests grammar-constrained decoding from
+        providers that support it (guarantees the shape, not just valid
+        JSON) — providers that don't support it may ignore it and fall back
+        to free-form JSON mode."""

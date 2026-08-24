@@ -22,5 +22,6 @@ def get_orchestrator_service(
 def get_chat_service(
     db: AsyncSession = Depends(get_db),
     orchestrator: OrchestratorService = Depends(get_orchestrator_service),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
 ) -> ChatService:
-    return ChatService(db, orchestrator)
+    return ChatService(db, orchestrator, embedding_provider)

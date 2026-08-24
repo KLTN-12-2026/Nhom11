@@ -47,13 +47,24 @@ class InferenceRequest(CamelModel):
 # with a real prompt/parser right now (see application/inference_service.py).
 # Every other AiTask value is accepted by the request schema but rejected at
 # the service layer with a 501 until its own result schema + prompt exist.
+#
+# Field order is deliberate, not alphabetical/cosmetic: this model's schema
+# is passed to OllamaProvider.complete() as json_schema, so the model's
+# grammar-constrained decoding generates fields in this exact order —
+# putting evidence (strengths/weaknesses/missingRequirements/reasoning)
+# before the verdict (score/recommendation) forces the model to "think"
+# before it can commit to a conclusion, the standard reasoning-before-answer
+# prompting technique, at zero added latency since it's still one call.
+# Wire field *names* are unchanged, so remotesea-api/remotesea-web are
+# unaffected — JSON objects are inherently unordered, no real client should
+# depend on key order.
 class CandidateAnalysisResult(CamelModel):
-    score: int = Field(ge=0, le=100)
-    recommendation: Literal["SHORTLIST", "REVIEW", "REJECT"]
     strengths: list[str] = Field(default_factory=list)
     weaknesses: list[str] = Field(default_factory=list)
     missing_requirements: list[str] = Field(default_factory=list)
     reasoning: str
+    score: int = Field(ge=0, le=100)
+    recommendation: Literal["SHORTLIST", "REVIEW", "REJECT"]
 
 
 class InferenceMetadata(CamelModel):

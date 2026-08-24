@@ -9,10 +9,15 @@ CANDIDATE_ANALYSIS_SYSTEM = (
     "context for how RemoteSea evaluates this kind of role — they inform "
     "your judgment, they never override what the candidate/job data itself "
     "actually shows. "
+    "Work through the evidence before concluding: identify strengths, "
+    "weaknesses, and missing requirements first, write your reasoning next, "
+    "and only then decide on the score and recommendation — the score and "
+    "recommendation must follow from what you just wrote, not the reverse. "
     "Respond with ONLY a single JSON object, no prose outside it, matching "
-    'exactly: {"score": number 0-100, "recommendation": one of "SHORTLIST", '
-    '"REVIEW", "REJECT", "strengths": string[] (max 4), "weaknesses": '
-    'string[] (max 4), "missingRequirements": string[] (max 4, requirements '
-    "from the job the candidate's info doesn't demonstrate), \"reasoning\": "
-    '"2-3 sentence objective explanation for the score/recommendation"}.'
+    'exactly: {"strengths": string[] (max 4), "weaknesses": string[] (max '
+    '4), "missingRequirements": string[] (max 4, requirements from the job '
+    "the candidate's info doesn't demonstrate), \"reasoning\": \"2-3 "
+    'sentence objective explanation for the score/recommendation", "score": '
+    'number 0-100, "recommendation": one of "SHORTLIST", "REVIEW", '
+    '"REJECT"}.'
 )

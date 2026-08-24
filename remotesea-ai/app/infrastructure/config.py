@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     ai_model_provider: Literal["OLLAMA", "MOCK"] = "OLLAMA"
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str = "qwen2.5:3b-instruct"
+    # How long Ollama keeps the model loaded in memory after a request —
+    # Ollama's own default is short enough that spaced-out requests can
+    # trigger a multi-second reload on the next call (observed live:
+    # ~15.8s just to reload before generation even starts). Ollama accepts
+    # a duration string ("30m") or a negative value to keep it loaded
+    # indefinitely.
+    ollama_keep_alive: str = "30m"
     port: int = 8000
     # Where the Dataset Builder writes train/validation/test.jsonl. Relative
     # paths resolve against the process cwd (repo root when run via uvicorn/

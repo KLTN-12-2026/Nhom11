@@ -149,26 +149,67 @@ curl calls and DB queries):
   `OllamaEmbeddingProvider` (`nomic-embed-text`, 768-dim) and a
   `MockEmbeddingProvider` for tests. Ingestion chunks on paragraph/sentence
   boundaries with overlap (`app/domain/rag/chunker.py`, pure/unit-tested) and
-  embeds in one batched call. Verified live: three real RemoteSea policy
-  documents ingested, two different natural-language questions each
-  correctly ranked the relevant document first by cosine distance, with the
-  unrelated document consistently ranked last.
+  embeds in one batched call. **Hybrid retrieval**: `retrieve()` combines
+  pgvector cosine-similarity search with Postgres full-text search
+  (`ts_rank`/`plainto_tsquery`), fused via Reciprocal Rank Fusion
+  (`app/domain/rag/fusion.py`, pure/unit-tested) — a keyword-heavy query no
+  longer has to rely on semantic similarity alone to surface an exact-term
+  match; when the full-text side finds nothing, this degrades to exactly
+  the vector-only ranking. Every returned `distance` is a real cosine
+  distance (computed in Python from the chunk's own embedding when it was
+  only found via full-text, not a mislabeled `ts_rank` score) — verified
+  live: a keyword-heavy query and a semantically-phrased query for the same
+  topic both correctly ranked the matching policy document first.
 - **Context Builder + routing** (`POST /v1/orchestrator/ask`) — the first
   endpoint that decides what to fetch rather than being told exactly what to
-  call: RAG retrieval always runs against the question; the `applicationId`
-  Tool only runs if the caller supplied one (a simple, disclosed rule, not
-  an LLM-driven intent classifier — see below). `context_builder.py` merges
-  user role/company + (optional) live application data + retrieved
-  knowledge + the question into one prompt with hard character caps per
-  section (`_MAX_LIVE_DATA_CHARS`/`_MAX_KNOWLEDGE_CHARS`), pure and
-  unit-tested. `sources` in the response is always computed from what this
-  service actually fetched, never taken from the model's own claims.
-  Verified live: a pure knowledge question answered correctly from RAG
-  alone; a question with a real `applicationId` correctly pulled that
-  application's live status via the Tool and grounded its answer in it; the
-  same question from a TALENT token (who can't access that Tool) correctly
-  got a 403 on the Tool call, caught, and still answered from RAG alone
-  rather than failing the whole request.
+  call. Without an `applicationId`, RAG always runs against the question —
+  no page context to classify against. With one, a single LLM
+  classification call (`OrchestratorService._select_tools`, `app/domain/
+  orchestrator/tool_selection.py`) decides **both** which of that
+  application's data sources (`application`/`candidate_analysis`/
+  `interview`) to fetch **and** whether RAG/knowledge retrieval is relevant
+  at all — a Tool-only question (e.g. "what's this application's status?")
+  now skips RAG's embed call and DB queries entirely instead of always
+  paying for both; on any classification failure it falls back to the old
+  "always fetch `application`, always run RAG" rule, so this can only do as
+  well as or better than before. Once decided, the selected tool fetches
+  and (if needed) RAG retrieval run **concurrently**, not sequentially.
+  `context_builder.py` merges user role/company + live data from the
+  selected tools + retrieved knowledge + the question into one prompt with
+  hard character caps per section, pure and unit-tested. `sources` in the
+  response is always computed from what this service actually fetched,
+  never taken from the model's own claims. Verified live: a pure knowledge
+  question answered correctly from RAG alone; a question specifically about
+  an interview's outcome, with an `applicationId`, correctly selected the
+  `interview` tool (not `application`); a question purely about an
+  application's own status correctly skipped RAG altogether (confirmed via
+  server log: zero `/api/embed` calls for that request); a wrong-role/
+  nonexistent-application Tool call is caught per-tool and the request
+  still answers from whatever else was available rather than failing
+  outright.
+- **Schema-constrained decoding**: `AiModelProvider.complete()` accepts an
+  optional `json_schema` — when given, Ollama's grammar-constrained decoding
+  (`format: <schema>`, not just `format: "json"`) guarantees the response
+  matches that shape, removing most malformed-response failures. Both
+  `CandidateAnalysisResult` and `/ask`/`/chat`'s internal `_ParsedAnswer`
+  use it. `CandidateAnalysisResult`'s field order is deliberate — evidence
+  (`strengths`/`weaknesses`/`missingRequirements`/`reasoning`) before the
+  verdict (`score`/`recommendation`) — since grammar-constrained decoding
+  generates fields in schema order, this structurally forces
+  reasoning-before-conclusion at zero added latency. Verified live against
+  the running Ollama instance before wiring it through the app.
+- **Connection reuse + `keep_alive`** — `OllamaProvider`/
+  `OllamaEmbeddingProvider` (both process-lifetime singletons via
+  `@lru_cache` in their `factory.py`) now hold one persistent
+  `httpx.AsyncClient` each instead of opening a fresh connection per call,
+  and every Ollama request sets `keep_alive` (`OLLAMA_KEEP_ALIVE`, default
+  `30m`) so the model stays resident between requests — a live smoke test
+  earlier in development hit a ~15.8s `load_duration` alone on a cold call
+  after the model had unloaded; verified live that a second call
+  immediately after a first shows no such reload spike. `app/main.py` has a
+  `lifespan` handler that closes these clients (and
+  `remotesea_api_client`'s own module-level client) on shutdown; confirmed
+  live with a clean `Application shutdown complete`, no errors.
 - **AI Chat** (`POST/GET /v1/orchestrator/chat`, `GET /v1/orchestrator/chat/{id}`
   — proxied through remotesea-api's `/ai-orchestrator/chat*`, and a real
   `/ai-chat` page in remotesea-web) — multi-turn on top of `ask()`'s same
@@ -188,6 +229,19 @@ curl calls and DB queries):
   incompatible with this machine's macOS 13), so the actual rendered page
   has not been visually confirmed; the user should check `/ai-chat` in a
   real browser themselves before treating the UI as done.
+- **Chat grounded in the same user's past sessions, not just the current
+  conversation** — `ChatService` embeds each question once (`nomic-embed-
+  text`, pgvector now enabled on `remotesea_ai` too, not only
+  `remotesea_rag`), reuses that same vector both to search the user's
+  *other* conversations by cosine similarity and to store on the new turn
+  (`ai_conversation_turns.embedding`, nullable — older turns have none and
+  are naturally excluded). Scoped strictly to `context.user_id`, never
+  cross-user — chat turns are real personal Q&A, unlike the anonymized
+  `HistoricalCase`s CANDIDATE_ANALYSIS uses. Surfaced as a distinct `RELATED
+  PAST CONVERSATIONS` prompt section, kept separate from the current
+  conversation's own `CONVERSATION HISTORY`. Verified live: a fact stated in
+  one conversation was correctly recalled when asked about from a brand-new,
+  otherwise-empty conversation.
 - **CANDIDATE_ANALYSIS is now grounded in RAG + historical cases**
   (`application/historical_case_service.py`) — before building its prompt,
   `InferenceService` retrieves relevant RAG chunks (query: job
@@ -215,6 +269,14 @@ curl calls and DB queries):
   call's persisted `retrieved_context` showed 2 real RAG chunk ids and
   `historicalCaseCount: 1` — correctly excluding 2 other matching
   interactions whose stored output used the old schema.
+- **Soft score/recommendation consistency check** — after a successful
+  parse, `check_score_recommendation_consistency` (`app/domain/
+  candidate_analysis/consistency.py`, pure) flags an obviously mismatched
+  pair (e.g. a high score paired with `REJECT`) as a logged warning plus a
+  `consistencyWarning: true` flag folded into `retrieved_context` — for
+  visibility only, it never rewrites the model's own score/recommendation
+  (business rules stay out of this service, same boundary the system prompt
+  itself states).
 
 **Deliberately not built yet** (this is the honest gap, not an oversight):
 
@@ -243,15 +305,20 @@ curl calls and DB queries):
 - The real Evaluation computation that feeds `/v1/models/{id}/evaluate`
   needs a trained model's actual predictions — the notebook's evaluation
   cell computes it, but hasn't been run for the same no-GPU reason.
-- **Real intent detection**: `/v1/orchestrator/ask` and `/chat`'s routing is
-  a plain, disclosed rule (RAG always, the application Tool only if an
-  `applicationId` was supplied), not an LLM deciding what it needs — the
-  doc's "Knowledge Question / Live Data Question / Complex Question / Pure
-  Conversation" classification is future work. Case retrieval in `ask()`/
-  `chat()` (as opposed to CANDIDATE_ANALYSIS, which has it) still isn't
-  wired in — a chat question doesn't get grounded in similar past chat
-  turns the way a CANDIDATE_ANALYSIS call is now grounded in similar past
-  analyses. vLLM + production hardening.
+- **Full intent detection**: `/v1/orchestrator/ask` and `/chat` now use one
+  LLM classification step to pick which of an application's data sources to
+  fetch *and* whether RAG/knowledge retrieval is relevant at all (see
+  "Context Builder + routing" above) — but only when an `applicationId` is
+  given; without one, RAG still unconditionally runs (there's no page
+  context to classify against). The doc's full "Knowledge Question / Live
+  Data Question / Complex Question / Pure Conversation" classification
+  (deciding whether to skip the LLM call entirely for something trivial) is
+  still future work. No separate/smaller model for the classification call
+  either — it uses the same `OLLAMA_MODEL` as everything else; a real speed
+  lever, not built yet since it adds a second model to configure/pull for a
+  call that's already short. `ask()` (unlike `chat()`) still has no
+  related-past-session grounding — it has no conversation identity to
+  anchor "past sessions" against. vLLM + production hardening.
 - Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
   pick which model to serve — it still always uses the fixed `OLLAMA_MODEL`
   env var. Wiring dynamic model selection into the provider is follow-up
