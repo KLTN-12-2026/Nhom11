@@ -30,9 +30,11 @@ class OllamaProvider(AiModelProvider):
     def model_version(self) -> str:
         return f"ollama:{self._model}"
 
-    def _payload(self, system: str, prompt: str, json_schema: dict | None, stream: bool) -> dict:
+    def _payload(
+        self, system: str, prompt: str, json_schema: dict | None, stream: bool, model: str | None
+    ) -> dict:
         return {
-            "model": self._model,
+            "model": model or self._model,
             "messages": [
                 {"role": "system", "content": system},
                 {"role": "user", "content": prompt},
@@ -52,11 +54,13 @@ class OllamaProvider(AiModelProvider):
             "keep_alive": self._keep_alive,
         }
 
-    async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
+    async def complete(
+        self, system: str, prompt: str, json_schema: dict | None = None, model: str | None = None
+    ) -> str:
         async def _call() -> dict:
             response = await self._client.post(
                 f"{self._base_url}/api/chat",
-                json=self._payload(system, prompt, json_schema, stream=False),
+                json=self._payload(system, prompt, json_schema, stream=False, model=model),
             )
             response.raise_for_status()
             return response.json()
@@ -64,8 +68,8 @@ class OllamaProvider(AiModelProvider):
         data = await with_retry(_call)
         return data["message"]["content"]
 
-    async def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
-        payload = self._payload(system, prompt, json_schema=None, stream=True)
+    async def stream(self, system: str, prompt: str, model: str | None = None) -> AsyncIterator[str]:
+        payload = self._payload(system, prompt, json_schema=None, stream=True, model=model)
         async with self._client.stream("POST", f"{self._base_url}/api/chat", json=payload) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():

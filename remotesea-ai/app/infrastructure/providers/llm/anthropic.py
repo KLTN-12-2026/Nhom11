@@ -44,9 +44,11 @@ class AnthropicProvider(AiModelProvider):
     def model_version(self) -> str:
         return f"anthropic:{self._model}"
 
-    def _payload(self, system: str, prompt: str, json_schema: dict | None, stream: bool) -> dict:
+    def _payload(
+        self, system: str, prompt: str, json_schema: dict | None, stream: bool, model: str | None
+    ) -> dict:
         payload: dict = {
-            "model": self._model,
+            "model": model or self._model,
             "max_tokens": _MAX_TOKENS,
             "system": system,
             "messages": [{"role": "user", "content": prompt}],
@@ -57,8 +59,10 @@ class AnthropicProvider(AiModelProvider):
             payload["tool_choice"] = {"type": "tool", "name": _STRUCTURED_OUTPUT_TOOL_NAME}
         return payload
 
-    async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
-        payload = self._payload(system, prompt, json_schema, stream=False)
+    async def complete(
+        self, system: str, prompt: str, json_schema: dict | None = None, model: str | None = None
+    ) -> str:
+        payload = self._payload(system, prompt, json_schema, stream=False, model=model)
 
         async def _call() -> dict:
             response = await self._client.post("/v1/messages", json=payload)
@@ -68,8 +72,8 @@ class AnthropicProvider(AiModelProvider):
         data = await with_retry(_call)
         return _extract_text(data, structured=json_schema is not None)
 
-    async def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
-        payload = self._payload(system, prompt, json_schema=None, stream=True)
+    async def stream(self, system: str, prompt: str, model: str | None = None) -> AsyncIterator[str]:
+        payload = self._payload(system, prompt, json_schema=None, stream=True, model=model)
         async with self._client.stream("POST", "/v1/messages", json=payload) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():

@@ -6,13 +6,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.historical_case_service import HistoricalCaseService
 from app.application.rag_retrieval_service import RagRetrievalService
-from app.domain.candidate_analysis.consistency import check_score_recommendation_consistency
+from app.application.structured_completion import complete_structured
+from app.domain.candidate_analysis.consistency import (
+    check_missing_requirements_against_skills,
+    check_score_recommendation_consistency,
+)
 from app.domain.candidate_analysis.historical_case import HistoricalCase
 from app.domain.candidate_analysis.prompt_builder import build_candidate_analysis_prompt
 from app.domain.candidate_analysis.prompts import CANDIDATE_ANALYSIS_SYSTEM
 from app.domain.rag.retrieved_chunk import RetrievedChunk
 from app.domain.shared.errors import error_message
-from app.domain.shared.llm_json import parse_json_object
 from app.infrastructure.logging import get_logger
 from app.infrastructure.models.ai_interaction import AiInteraction, AiInteractionStatus, AiTask
 from app.infrastructure.providers.embedding.base import EmbeddingProvider
@@ -104,13 +107,14 @@ class InferenceService:
             }
 
         started_at = time.monotonic()
-        raw_output: str | None = None
         try:
             prompt = build_candidate_analysis_prompt(request.context, rag_chunks, historical_cases)
-            raw_output = await self._provider.complete(
-                CANDIDATE_ANALYSIS_SYSTEM, prompt, json_schema=CandidateAnalysisResult.model_json_schema()
+            # complete_structured retries once on an unparseable response
+            # before giving up — schema-constrained decoding makes this
+            # rare, not impossible.
+            raw_output, parsed = await complete_structured(
+                self._provider, CandidateAnalysisResult, CANDIDATE_ANALYSIS_SYSTEM, prompt
             )
-            parsed = parse_json_object(raw_output, CandidateAnalysisResult)
             if parsed is None:
                 raise ValueError("Model returned an unparseable response")
             status = AiInteractionStatus.SUCCESS
@@ -132,6 +136,17 @@ class InferenceService:
                     consistency_warning,
                 )
                 retrieved_context = {**(retrieved_context or {}), "consistencyWarning": True}
+
+            grounded_conflicts = check_missing_requirements_against_skills(
+                parsed.missing_requirements, request.context.candidate.skills
+            )
+            if grounded_conflicts:
+                logger.warning(
+                    "CANDIDATE_ANALYSIS claims a requirement is missing that the candidate's "
+                    "own skills list already states: %s",
+                    grounded_conflicts,
+                )
+                retrieved_context = {**(retrieved_context or {}), "groundednessWarning": True}
 
         latency_ms = int((time.monotonic() - started_at) * 1000)
         interaction = AiInteraction(

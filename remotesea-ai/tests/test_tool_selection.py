@@ -16,3 +16,8 @@ class TestBuildToolSelectionPrompt:
     def test_omits_tool_not_in_available_list(self):
         prompt = build_tool_selection_prompt("question", ["application"])
         assert "candidate_analysis" not in prompt
+
+    def test_handles_empty_available_tools_without_crashing(self):
+        prompt = build_tool_selection_prompt("hello, thanks!", [])
+        assert "hello, thanks!" in prompt
+        assert "none" in prompt.lower()

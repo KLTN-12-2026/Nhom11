@@ -25,6 +25,13 @@ class Settings(BaseSettings):
     # setups; picking ANTHROPIC/GEMINI requires setting this to a model that
     # provider actually serves — not silently guessed per-provider.
     ai_model: str = "qwen2.5:3b-instruct"
+    # Optional override for the tool-selection/RAG-necessity classification
+    # call specifically (OrchestratorService._select_tools) — that's a much
+    # simpler decision than a full answer, so a smaller/faster model is a
+    # reasonable fit there without touching CANDIDATE_ANALYSIS or the main
+    # answer call. None (default) means "use ai_model" — opt-in, changes
+    # nothing for anyone who doesn't set it.
+    ai_classification_model: str | None = None
     # Shared across all three providers — Ollama's CPU-only local inference
     # is the slow case this was originally sized for; cloud providers
     # (Anthropic/Gemini) finish well within it in practice.

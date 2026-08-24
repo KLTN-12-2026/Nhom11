@@ -193,25 +193,49 @@ curl calls and DB queries):
   orchestrator/tool_selection.py`) decides **both** which of that
   application's data sources (`application`/`candidate_analysis`/
   `interview`) to fetch **and** whether RAG/knowledge retrieval is relevant
-  at all — a Tool-only question (e.g. "what's this application's status?")
-  now skips RAG's embed call and DB queries entirely instead of always
-  paying for both; on any classification failure it falls back to the old
-  "always fetch `application`, always run RAG" rule, so this can only do as
-  well as or better than before. Once decided, the selected tool fetches
+  at all — **this classification call now always runs**, even with no
+  `applicationId` (previously RAG ran unconditionally in that case); a
+  purely conversational message skips RAG entirely instead of always paying
+  for an embed call + DB queries it doesn't need. Runs on its own model
+  (`AI_CLASSIFICATION_MODEL`, optional — see below) since it's a much
+  simpler decision than the final answer. On any classification failure it
+  falls back to "always fetch `application`" (or nothing, with no
+  `applicationId`) + "always run RAG," so this can only do as well as or
+  better than the old fixed rule. Once decided, the selected tool fetches
   and (if needed) RAG retrieval run **concurrently**, not sequentially.
   `context_builder.py` merges user role/company + live data from the
   selected tools + retrieved knowledge + the question into one prompt with
   hard character caps per section, pure and unit-tested. `sources` in the
   response is always computed from what this service actually fetched,
-  never taken from the model's own claims. Verified live: a pure knowledge
-  question answered correctly from RAG alone; a question specifically about
-  an interview's outcome, with an `applicationId`, correctly selected the
-  `interview` tool (not `application`); a question purely about an
-  application's own status correctly skipped RAG altogether (confirmed via
-  server log: zero `/api/embed` calls for that request); a wrong-role/
-  nonexistent-application Tool call is caught per-tool and the request
-  still answers from whatever else was available rather than failing
-  outright.
+  never taken from the model's own claims. **`"interview"`'s tool
+  description was corrected** after a business-context accuracy audit found
+  it oversold what the tool actually returns — it's scheduling/status only
+  (proposed/confirmed time slots, meeting link), not a hiring outcome or
+  recommendation (that's `Scorecard.recommendation` on the remotesea-api
+  side, which no Tool here exposes yet — a real, disclosed gap, not
+  something to invent). Verified live: a pure knowledge question answered
+  correctly from RAG alone; a purely conversational message with no
+  `applicationId` correctly skipped RAG altogether (confirmed via server
+  log: zero `/api/embed` calls); a question purely about an application's
+  own status correctly skipped RAG too; a wrong-role/nonexistent-application
+  Tool call is caught per-tool and the request still answers from whatever
+  else was available rather than failing outright.
+- **Fixed a real, live-reachable bug**: `CandidateAnalysisToolResult`
+  required an `applicationId` field remotesea-api's real
+  `candidate-analysis` Tool endpoint never returns (confirmed by reading
+  `cvAnalysisSelect` in remotesea-api directly) — every real call to that
+  tool raised a Pydantic `ValidationError`, which `_fetch_tool` didn't
+  catch (only `HTTPException` was), turning into an unhandled 502 for the
+  **entire** `/ask`/`/chat` request. Fixed by removing the field (it
+  structurally doesn't exist) and broadening `_fetch_tool`'s exception
+  handling to catch any unexpected failure per-tool, not just
+  `HTTPException` — one Tool's response-shape mismatch now degrades
+  gracefully (skip that source) instead of failing the whole request, the
+  same defense-in-depth already applied to RAG/historical-case lookups.
+  Verified live: the exact broken payload shape (matching remotesea-api's
+  real `cvAnalysisSelect`) now validates successfully against the fixed
+  schema, and was independently confirmed to have failed against the old
+  one on the identical payload.
 - **Schema-constrained decoding**: `AiModelProvider.complete()` accepts an
   optional `json_schema` — when given, Ollama's grammar-constrained decoding
   (`format: <schema>`, not just `format: "json"`) guarantees the response
@@ -235,6 +259,43 @@ curl calls and DB queries):
   `lifespan` handler that closes these clients (and
   `remotesea_api_client`'s own module-level client) on shutdown; confirmed
   live with a clean `Application shutdown complete`, no errors.
+- **Validate-and-retry on unparseable structured output**
+  (`app/application/structured_completion.py:complete_structured`) — schema-
+  constrained decoding makes an invalid response rare, not impossible; both
+  `InferenceService` and `OrchestratorService` now retry the completion call
+  once (not just parse-and-give-up) before falling back to their existing
+  failure handling (CANDIDATE_ANALYSIS still marks `FAILED`; ask/chat still
+  falls back to raw text at 0 confidence) — today's failure-path *outcomes*
+  are unchanged, only a second attempt happens first.
+- **Per-task model** (`AI_CLASSIFICATION_MODEL`, optional, default unset =
+  use `AI_MODEL`) — the tool-selection/RAG-necessity classification call can
+  run on a different (e.g. smaller/faster) model than the main answer,
+  since it's a much simpler decision. **Live-tested with a real smaller
+  local model (`qwen2.5:1.5b` vs. the default `qwen2.5:3b-instruct`) and
+  the result is a genuine, disclosed tradeoff, not a free win**: the smaller
+  model *was* noticeably faster, but on one repeated test question ("what
+  is the notice period policy for scheduling?") it incorrectly decided
+  `needsKnowledge: false` and the request came back with no RAG grounding
+  at all ("NOT ENOUGH INFORMATION" instead of the correct "48 hours") — the
+  same question correctly triggers RAG and answers correctly with the
+  default 3B model doing classification. Left unset by default for exactly
+  this reason; documented here so switching it is an informed choice, not
+  an assumed improvement.
+- **Bounded RAG result cache** (`app/application/rag_retrieval_service.py`,
+  module-level, keyed on normalized `(query, top_k)`, 5-minute TTL, small
+  max size) — a repeated identical question skips the embed call + two DB
+  queries entirely. `RagIngestionService` clears it after every successful
+  ingest so a newly-added document is never masked by a stale cached result.
+  Verified live: two identical `POST /v1/rag/search` calls back-to-back —
+  the second logged zero `/api/embed` calls and returned in ~0.03s vs. the
+  first's ~0.25s.
+- **Groundedness check for CANDIDATE_ANALYSIS**
+  (`check_missing_requirements_against_skills`, alongside the existing
+  score/recommendation consistency check) — targets one specific, checkable
+  hallucination pattern rather than general fact-checking: flags (via a
+  `groundednessWarning` in `retrieved_context`, logged, never rewriting the
+  model's output) when a `missingRequirements` entry names a skill the
+  candidate's own skills list already states — a mistake small models make.
 - **AI Chat** (`POST/GET /v1/orchestrator/chat`, `GET /v1/orchestrator/chat/{id}`
   — proxied through remotesea-api's `/ai-orchestrator/chat*`, and a real
   `/ai-chat` page in remotesea-web) — multi-turn on top of `ask()`'s same
@@ -332,19 +393,24 @@ curl calls and DB queries):
   cell computes it, but hasn't been run for the same no-GPU reason.
 - **Full intent detection**: `/v1/orchestrator/ask` and `/chat` now use one
   LLM classification step to pick which of an application's data sources to
-  fetch *and* whether RAG/knowledge retrieval is relevant at all (see
-  "Context Builder + routing" above) — but only when an `applicationId` is
-  given; without one, RAG still unconditionally runs (there's no page
-  context to classify against). The doc's full "Knowledge Question / Live
-  Data Question / Complex Question / Pure Conversation" classification
-  (deciding whether to skip the LLM call entirely for something trivial) is
-  still future work. No separate/smaller model for the classification call
-  either — it uses the same `AI_MODEL` as everything else; a real speed
-  lever, not built yet since it adds a second model to configure/pull for a
-  call that's already short. `ask()` (unlike `chat()`) still has no
-  related-past-session grounding — it has no conversation identity to
-  anchor "past sessions" against. vLLM as a fourth provider (self-hosted,
-  GPU) + production hardening.
+  fetch *and* whether RAG/knowledge retrieval is relevant at all, and this
+  now runs unconditionally (an `applicationId` is no longer required to
+  trigger it — see "Context Builder + routing" above). The doc's full
+  "Knowledge Question / Live Data Question / Complex Question / Pure
+  Conversation" classification (deciding whether to skip the *final* LLM
+  call entirely for something trivial like a greeting) is still future
+  work — every message still gets a real generation call. `ask()` (unlike
+  `chat()`) still has no related-past-session grounding — it has no
+  conversation identity to anchor "past sessions" against.
+- **No Scorecard/hiring-outcome Tool** — an accuracy audit against
+  remotesea-api confirmed hiring recommendation data
+  (`Scorecard.recommendation`: `STRONG_YES`/`YES`/`NO`/`STRONG_NO`) isn't
+  exposed by any of the three existing Tools (`interview` is
+  scheduling/status only). Adding one needs a new remotesea-api endpoint —
+  cross-repo, out of scope for a remotesea-ai-only change — so a question
+  about hiring outcome currently gets an honest "not enough information"
+  rather than a wrong or invented answer, not a real answer.
+  vLLM as a fourth provider (self-hosted, GPU) + production hardening.
 - Nothing currently makes `OllamaProvider` read `GET /v1/models/active` to
   pick which model to serve — it still always uses the fixed `AI_MODEL`
   env var. Wiring dynamic model selection into the provider is follow-up

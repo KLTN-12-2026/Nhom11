@@ -10,9 +10,14 @@ class ApplicationToolResult(CamelModel):
     talent: dict
 
 
+# No applicationId field — remotesea-api's cvAnalysisSelect
+# (src/modules/cv-analysis/interfaces.ts) never returns one; it's implied
+# by the URL this was fetched from, not part of the row itself. A required
+# `application_id: str` here previously made every real call fail Pydantic
+# validation (found by an accuracy audit against remotesea-api's real
+# select shape — this was live-reachable, not hypothetical).
 class CandidateAnalysisToolResult(CamelModel):
     id: str
-    application_id: str
     fit_score: int
     summary: str
     strengths: list[str]

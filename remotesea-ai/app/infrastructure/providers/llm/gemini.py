@@ -34,12 +34,14 @@ class GeminiProvider(AiModelProvider):
     def model_version(self) -> str:
         return f"gemini:{self._model}"
 
-    async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
+    async def complete(
+        self, system: str, prompt: str, json_schema: dict | None = None, model: str | None = None
+    ) -> str:
         payload = _build_payload(system, prompt, json_schema)
 
         async def _call() -> dict:
             response = await self._client.post(
-                f"/models/{self._model}:generateContent",
+                f"/models/{model or self._model}:generateContent",
                 params={"key": self._api_key},
                 json=payload,
             )
@@ -49,11 +51,11 @@ class GeminiProvider(AiModelProvider):
         data = await with_retry(_call)
         return _extract_text(data)
 
-    async def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
+    async def stream(self, system: str, prompt: str, model: str | None = None) -> AsyncIterator[str]:
         payload = _build_payload(system, prompt, json_schema=None)
         async with self._client.stream(
             "POST",
-            f"/models/{self._model}:streamGenerateContent",
+            f"/models/{model or self._model}:streamGenerateContent",
             params={"key": self._api_key, "alt": "sse"},
             json=payload,
         ) as response:

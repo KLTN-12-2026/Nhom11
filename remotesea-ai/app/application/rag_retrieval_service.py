@@ -1,3 +1,5 @@
+import time
+
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +14,42 @@ from app.infrastructure.providers.embedding.base import EmbeddingProvider
 # match should still be able to surface after fusion, which it couldn't if
 # each side only fetched exactly top_k.
 _OVER_FETCH_FACTOR = 4
+
+# Module-level, not per-instance — RagRetrievalService is constructed fresh
+# per request (see OrchestratorService/InferenceService), so a per-instance
+# cache would never be hit twice. Bounded size + short TTL: this is a
+# latency optimization for a repeated identical question (a real, observed
+# pattern in this session's own FAQ-style test queries), not a correctness-
+# critical structure — a stale hit for up to _CACHE_TTL_SECONDS is an
+# acceptable tradeoff, and RagIngestionService clears it on every successful
+# ingest so a newly-added document is never masked for the rest of the TTL.
+_CACHE_TTL_SECONDS = 300.0
+_CACHE_MAX_SIZE = 200
+_cache: dict[tuple[str, int], tuple[float, list[RetrievedChunk]]] = {}
+
+
+def clear_cache() -> None:
+    _cache.clear()
+
+
+def _cache_get(key: tuple[str, int]) -> list[RetrievedChunk] | None:
+    entry = _cache.get(key)
+    if entry is None:
+        return None
+    cached_at, chunks = entry
+    if time.monotonic() - cached_at > _CACHE_TTL_SECONDS:
+        del _cache[key]
+        return None
+    return chunks
+
+
+def _cache_set(key: tuple[str, int], chunks: list[RetrievedChunk]) -> None:
+    if len(_cache) >= _CACHE_MAX_SIZE:
+        # Evict the oldest entry — simple bound, not a full LRU; this cache
+        # is a latency optimization, not a structure worth more machinery.
+        oldest_key = min(_cache, key=lambda k: _cache[k][0])
+        del _cache[oldest_key]
+    _cache[key] = (time.monotonic(), chunks)
 
 
 class RagRetrievalService:
@@ -29,6 +67,11 @@ class RagRetrievalService:
     # from an indexed generated column — correct at the current knowledge
     # base's scale, a real but separate follow-up once it grows much larger.
     async def retrieve(self, query: str, top_k: int = 5) -> list[RetrievedChunk]:
+        cache_key = (query.strip().lower(), top_k)
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            return cached
+
         [query_embedding] = await self._embedding_provider.embed([query])
         over_fetch = top_k * _OVER_FETCH_FACTOR
 
@@ -63,7 +106,9 @@ class RagRetrievalService:
         vector_results = [self._to_retrieved_chunk(row, query_embedding) for row in vector_rows]
         fts_results = [self._to_retrieved_chunk(row, query_embedding) for row in fts_rows]
 
-        return reciprocal_rank_fusion(vector_results, fts_results, top_k=top_k)
+        result = reciprocal_rank_fusion(vector_results, fts_results, top_k=top_k)
+        _cache_set(cache_key, result)
+        return result
 
     @staticmethod
     def _to_retrieved_chunk(row, query_embedding: list[float]) -> RetrievedChunk:

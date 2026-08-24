@@ -16,8 +16,10 @@ class MockProvider(AiModelProvider):
     def model_version(self) -> str:
         return "mock:static"
 
-    async def complete(self, system: str, prompt: str, json_schema: dict | None = None) -> str:
+    async def complete(
+        self, system: str, prompt: str, json_schema: dict | None = None, model: str | None = None
+    ) -> str:
         return self._response
 
-    async def stream(self, system: str, prompt: str) -> AsyncIterator[str]:
+    async def stream(self, system: str, prompt: str, model: str | None = None) -> AsyncIterator[str]:
         yield self._response

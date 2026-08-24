@@ -2,6 +2,7 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application import rag_retrieval_service
 from app.domain.rag.chunker import chunk_text
 from app.infrastructure.models.rag_chunk import RagChunk
 from app.infrastructure.models.rag_document import RagDocument
@@ -42,4 +43,8 @@ class RagIngestionService:
 
         await self._db.commit()
         await self._db.refresh(document)
+        # A newly-ingested document must be findable immediately — never
+        # masked by a stale cached result from before it existed for the
+        # rest of RagRetrievalService's cache TTL.
+        rag_retrieval_service.clear_cache()
         return document

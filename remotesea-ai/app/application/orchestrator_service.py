@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application import tool_service
 from app.application.rag_retrieval_service import RagRetrievalService
+from app.application.structured_completion import complete_structured
 from app.domain.orchestrator.context_builder import build_context
 from app.domain.orchestrator.history_turn import HistoryTurn
 from app.domain.orchestrator.prompts import ASK_SYSTEM_PROMPT, TOOL_SELECTION_SYSTEM
@@ -13,6 +14,7 @@ from app.domain.orchestrator.tool_selection import build_tool_selection_prompt
 from app.domain.rag.retrieved_chunk import RetrievedChunk
 from app.domain.shared.errors import error_message
 from app.domain.shared.llm_json import parse_json_object
+from app.infrastructure.config import get_settings
 from app.infrastructure.logging import get_logger
 from app.infrastructure.providers.llm.base import AiModelProvider
 from app.infrastructure.providers.embedding.base import EmbeddingProvider
@@ -46,18 +48,20 @@ class _ToolSelection(CamelModel):
     needs_knowledge: bool = True
 
 
-# Without an application_id, RAG always runs against the question text —
-# there's no page context to classify against, so there's nothing else to
-# decide. With one, a single LLM classification call (_select_tools)
-# decides both which of that application's data sources (application/
-# candidate_analysis/interview) to fetch AND whether RAG/knowledge
-# retrieval is relevant at all — a Tool-only question (e.g. "what's this
-# application's status?") now skips RAG's embed call + DB queries entirely
-# instead of always paying for it alongside the Tool fetch. Not yet a full
-# "Live Data Question vs. Knowledge Question vs. Pure Conversation"
-# classifier (that would also decide whether to skip the LLM call itself
-# for something trivial), but a real per-question decision, not a fixed
-# rule pretending to be one.
+# One LLM classification call (_select_tools) always runs first, deciding
+# both which of an application's data sources (application/
+# candidate_analysis/interview — empty when there's no applicationId, so
+# nothing to fetch) to pull AND whether RAG/knowledge retrieval is relevant
+# at all — a Tool-only question (e.g. "what's this application's status?")
+# skips RAG's embed call + DB queries entirely, and a purely conversational
+# message with no applicationId skips it too, instead of RAG always running
+# unconditionally the way it used to whenever there was no page context.
+# Runs on a possibly-smaller/faster model (AI_CLASSIFICATION_MODEL) since
+# it's a much simpler decision than the final answer — see
+# infrastructure/config.py. Not yet a full "Live Data Question vs.
+# Knowledge Question vs. Pure Conversation" classifier (that would also
+# decide whether to skip the final LLM call itself for something trivial),
+# but a real per-question decision, not a fixed rule pretending to be one.
 class OrchestratorService:
     def __init__(
         self,
@@ -75,23 +79,30 @@ class OrchestratorService:
         return await self.generate(context, bearer_token, request.question, request.application_id)
 
     # Returns (selected tool names, whether RAG/knowledge retrieval is
-    # needed) — one classification call now decides both, instead of a
-    # separate round-trip for each, and RAG no longer runs unconditionally
-    # alongside a Tool-only question.
-    async def _select_tools(self, question: str) -> tuple[list[str], bool]:
+    # needed). available_tools is empty when there's no applicationId —
+    # this still runs (to decide needs_knowledge), it just has nothing to
+    # pick a tool from. default_tools only ever includes "application" when
+    # there was something to fall back to in the first place — falling back
+    # to ["application"] with no applicationId to fetch it against would be
+    # a meaningless recommendation, not a safe default.
+    async def _select_tools(self, question: str, available_tools: list[str]) -> tuple[list[str], bool]:
+        default_tools = _DEFAULT_TOOLS if available_tools else []
         try:
-            prompt = build_tool_selection_prompt(question, list(_TOOL_CALLS))
+            prompt = build_tool_selection_prompt(question, available_tools)
             raw = await self._provider.complete(
-                TOOL_SELECTION_SYSTEM, prompt, json_schema=_ToolSelection.model_json_schema()
+                TOOL_SELECTION_SYSTEM,
+                prompt,
+                json_schema=_ToolSelection.model_json_schema(),
+                model=get_settings().ai_classification_model,
             )
             parsed = parse_json_object(raw, _ToolSelection)
             if parsed is None:
-                return _DEFAULT_TOOLS, True
-            selected = [name for name in parsed.tools if name in _TOOL_CALLS]
-            return selected or _DEFAULT_TOOLS, parsed.needs_knowledge
-        except Exception as exc:  # noqa: BLE001 - never worse than the old fixed rule
-            logger.warning("Tool selection failed, falling back to default: %s", error_message(exc))
-            return _DEFAULT_TOOLS, True
+                return default_tools, True
+            selected = [name for name in parsed.tools if name in available_tools]
+            return selected or default_tools, parsed.needs_knowledge
+        except Exception as exc:  # noqa: BLE001 - never worse than always running RAG
+            logger.warning("Tool/knowledge classification failed, falling back to default: %s", error_message(exc))
+            return default_tools, True
 
     async def _fetch_tool(self, name: str, application_id: str, bearer_token: str) -> dict | None:
         fetch, label = _TOOL_CALLS[name]
@@ -108,6 +119,22 @@ class OrchestratorService:
                 label,
                 application_id,
                 exc.status_code,
+            )
+            return None
+        except Exception as exc:  # noqa: BLE001 - one tool failing must not fail the whole request
+            # A Tool response that doesn't match its declared schema — a
+            # remotesea-api response-shape drift, or any other unexpected
+            # failure — must degrade the same way a 403/404 does: skip this
+            # one source, don't fail the whole question. Found by a real
+            # instance of this (CandidateAnalysisToolResult previously
+            # required a field remotesea-api never actually returns, which
+            # raised ValidationError here and 502'd the entire request).
+            logger.warning(
+                "%s lookup for application %s raised %s, answering without it: %s",
+                label,
+                application_id,
+                type(exc).__name__,
+                error_message(exc),
             )
             return None
 
@@ -131,11 +158,9 @@ class OrchestratorService:
     ) -> AskResponse:
         sources: list[str] = []
         application_data: dict | None = None
-        selected_tools: list[str] = []
-        needs_knowledge = True
 
-        if application_id:
-            selected_tools, needs_knowledge = await self._select_tools(question)
+        available_tools = list(_TOOL_CALLS) if application_id else []
+        selected_tools, needs_knowledge = await self._select_tools(question, available_tools)
 
         # RAG retrieval and the LLM call are both external dependencies
         # (RAG DB, Ollama) that can fail transiently — unlike the Tool calls
@@ -171,21 +196,22 @@ class OrchestratorService:
                         sources.append(f"{label}: {application_id}")
                 if not application_data:
                     application_data = None
-            else:
+            elif needs_knowledge:
                 rag_chunks = await self._retrieve_rag_chunks(question)
+            else:
+                rag_chunks = []
 
             sources += [f"Knowledge: {chunk.document_title}" for chunk in rag_chunks]
 
             prompt = build_context(context, question, application_data, rag_chunks, history, related_turns)
-            raw = await self._provider.complete(
-                ASK_SYSTEM_PROMPT, prompt, json_schema=_ParsedAnswer.model_json_schema()
-            )
+            # complete_structured retries once on an unparseable response
+            # before falling through to the raw-text fallback below.
+            raw, parsed = await complete_structured(self._provider, _ParsedAnswer, ASK_SYSTEM_PROMPT, prompt)
         except Exception as exc:  # noqa: BLE001 - converted to a clean 502 below
             message = error_message(exc)
             logger.warning("Orchestrator generation failed: %s", message)
             raise RuntimeError(message) from exc
 
-        parsed = parse_json_object(raw, _ParsedAnswer)
         if parsed is None:
             # Same "never silently drop the model's output" principle as
             # inference_service — an unparseable response still becomes an
