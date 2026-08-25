@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from logging.config import fileConfig
 
 from alembic import context
@@ -41,7 +42,20 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    connectable: AsyncEngine = create_async_engine(get_url())
+    # See alembic/env.py's identical block for the full reasoning and live
+    # verification against Supabase's port-6543 pooler: a random
+    # prepared_statement_name_func is required (statement_cache_size=0
+    # alone is insufficient) to avoid DuplicatePreparedStatementError when
+    # DATABASE_URL/RAG_DATABASE_URL points through a transaction-mode
+    # pgbouncer.
+    connectable: AsyncEngine = create_async_engine(
+        get_url(),
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
+        },
+    )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()

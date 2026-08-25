@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from logging.config import fileConfig
 
 from alembic import context
@@ -49,7 +50,36 @@ def do_run_migrations(connection) -> None:
 
 
 async def run_migrations_online() -> None:
-    connectable: AsyncEngine = create_async_engine(get_url())
+    # A transaction-mode pgbouncer/Supabase pooler (port 6543) multiplexes
+    # many client connections onto a shared set of backend sockets, so
+    # asyncpg's default sequential prepared-statement names
+    # (__asyncpg_stmt_1__, _2__, ...) can collide with a statement some
+    # *other* client already prepared on whichever backend this connection
+    # happens to land on — asyncpg.exceptions.DuplicatePreparedStatementError,
+    # deterministically reproduced against Supabase's port-6543 pooler even
+    # on a single, one-shot, first-query connection (real failure seen in a
+    # Render deploy). `statement_cache_size=0` alone does NOT fix this — it
+    # only disables asyncpg's *client-side* cache of already-prepared
+    # statements, not the colliding server-side name (verified live: still
+    # fails with only this set — same insufficient result database.py's own
+    # comment documents for the app's runtime engine). The actual fix is
+    # `prepared_statement_name_func`: generate a random name per prepare so
+    # it can never collide with another client's statement on the shared
+    # backend, verified live across 5 consecutive connections against the
+    # port-6543 pooler. Applied here (not database.py) because this is a
+    # migration-only concern — the app's long-lived engine already avoids
+    # this entirely by using the session-mode pooler port (5432) instead,
+    # where each connection gets its own dedicated backend; a fresh deploy
+    # target that's only ever handed a transaction-mode DATABASE_URL still
+    # needs `alembic upgrade head` itself to work regardless.
+    connectable: AsyncEngine = create_async_engine(
+        get_url(),
+        connect_args={
+            "statement_cache_size": 0,
+            "prepared_statement_cache_size": 0,
+            "prepared_statement_name_func": lambda: f"__asyncpg_{uuid.uuid4()}__",
+        },
+    )
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
