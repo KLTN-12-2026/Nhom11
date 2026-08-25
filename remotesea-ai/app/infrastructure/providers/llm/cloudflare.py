@@ -29,10 +29,11 @@ class CloudflareProvider(AiModelProvider):
         settings = get_settings()
         if not settings.cloudflare_account_id or not settings.cloudflare_api_token:
             raise ValueError(
-                "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required when AI_PROVIDER=CLOUDFLARE"
+                "CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are required "
+                "when AI_MODEL_PROVIDER=CLOUDFLARE"
             )
         self._account_id = settings.cloudflare_account_id
-        self._model = settings.ai_model
+        self._model = settings.resolved_cloudflare_model
         self._temperature = settings.ai_temperature
         self._client = httpx.AsyncClient(
             base_url=_API_BASE,

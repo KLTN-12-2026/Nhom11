@@ -17,7 +17,7 @@ class OllamaProvider(AiModelProvider):
     def __init__(self) -> None:
         settings = get_settings()
         self._base_url = settings.ollama_base_url
-        self._model = settings.ai_model
+        self._model = settings.resolved_ollama_model
         self._keep_alive = settings.ollama_keep_alive
         self._temperature = settings.ai_temperature
         # CPU-only local inference (see README: no GPU in dev) is slow —

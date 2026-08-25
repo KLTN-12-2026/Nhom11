@@ -12,14 +12,14 @@ from app.infrastructure.providers.llm.ollama import OllamaProvider
 @lru_cache
 def get_provider() -> AiModelProvider:
     settings = get_settings()
-    if settings.ai_provider == "OLLAMA":
+    if settings.ai_model_provider == "OLLAMA":
         return OllamaProvider()
-    if settings.ai_provider == "ANTHROPIC":
+    if settings.ai_model_provider == "ANTHROPIC":
         return AnthropicProvider()
-    if settings.ai_provider == "GEMINI":
+    if settings.ai_model_provider == "GEMINI":
         return GeminiProvider()
-    if settings.ai_provider == "CLOUDFLARE":
+    if settings.ai_model_provider == "CLOUDFLARE":
         return CloudflareProvider()
-    if settings.ai_provider == "MOCK":
+    if settings.ai_model_provider == "MOCK":
         return MockProvider()
-    raise ValueError(f"Unsupported AI_PROVIDER: {settings.ai_provider}")
+    raise ValueError(f"Unsupported AI_MODEL_PROVIDER: {settings.ai_model_provider}")

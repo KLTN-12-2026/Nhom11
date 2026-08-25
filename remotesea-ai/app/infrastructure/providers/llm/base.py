@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 # directly — same reasoning as remotesea-api's AiService abstraction over
 # Anthropic/Gemini. Swapping OLLAMA for ANTHROPIC/GEMINI (or a different
 # open-weight model — Qwen/Llama/Mistral) means adding/selecting a class
-# here (see factory.py's AI_PROVIDER switch), not touching any caller.
+# here (see factory.py's AI_MODEL_PROVIDER switch), not touching any caller.
 class AiModelProvider(ABC):
     @property
     @abstractmethod

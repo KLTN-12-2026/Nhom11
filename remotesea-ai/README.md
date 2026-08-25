@@ -63,7 +63,8 @@ Two independent Postgres databases, each with its own Alembic chain
 (`alembic/` for `remotesea_ai`, `alembic_rag/` for `remotesea_rag`) — see
 "Local setup" below. `application/` and `domain/` only ever depend on the
 `AiModelProvider` interface in `providers/llm/base.py`, never a concrete
-vendor — swapping models/vendors (`AI_PROVIDER`/`AI_MODEL`, see below) or
+vendor — swapping models/vendors (`AI_MODEL_PROVIDER`/`AI_MODEL`, plus each
+provider's own `OLLAMA_MODEL`/`CLOUDFLARE_MODEL` override — see below) or
 adding a new one (a `VLLMProvider`, say) means adding/selecting one class
 under `infrastructure/providers/llm/`, not touching either layer.
 
@@ -78,7 +79,7 @@ curl calls and DB queries):
 - **`AiModelProvider` abstraction with three real implementations** —
   `OllamaProvider` (default, self-hosted, running **Qwen2.5-3B-Instruct**
   locally, CPU-only — zero API key needed), `AnthropicProvider`, and
-  `GeminiProvider`, selected via `AI_PROVIDER`/`AI_MODEL`
+  `GeminiProvider`, selected via `AI_MODEL_PROVIDER`/`AI_MODEL`
   (`app/infrastructure/providers/llm/factory.py`). All three implemented
   against raw `httpx` (no `anthropic`/`google-genai` SDK dependency added —
   same reasoning `OllamaProvider` already followed) and share one retry
