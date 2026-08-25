@@ -12,7 +12,22 @@ from sqlalchemy.orm import DeclarativeBase
 # hand-duplicated copies of the same engine/sessionmaker/Base boilerplate.
 class DatabaseHandle:
     def __init__(self, database_url: str) -> None:
-        self.engine: AsyncEngine = create_async_engine(database_url, pool_pre_ping=True)
+        self.engine: AsyncEngine = create_async_engine(
+            database_url,
+            pool_pre_ping=True,
+            # asyncpg caches prepared statements per-connection by default —
+            # incompatible with PgBouncer running in transaction-pooling mode
+            # (e.g. Supabase's pooler on port 6543), which hands out a
+            # different backend connection per transaction: a statement
+            # prepared against one backend connection doesn't exist on the
+            # next, raising DuplicatePreparedStatementError/"prepared
+            # statement does not exist" under real concurrent use. Harmless
+            # on a direct (non-pooled) connection like local Docker Postgres
+            # — just skips a minor query-plan-caching optimization there —
+            # so this is set unconditionally rather than branching on which
+            # database_url was given.
+            connect_args={"statement_cache_size": 0},
+        )
         self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False)
 
         class Base(DeclarativeBase):

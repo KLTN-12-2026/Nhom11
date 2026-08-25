@@ -166,25 +166,47 @@ curl calls and DB queries):
   business error (no résumé uploaded) propagates through unmodified rather
   than becoming an opaque 500.
 - **RAG** (`POST /v1/rag/documents`, `GET /v1/rag/documents`,
-  `POST /v1/rag/search`) — its own database (`remotesea_rag`, a second
-  database on the same Postgres server as `remotesea_ai`, per the explicit
-  decision to keep knowledge-base storage independent from the Learning
-  Loop's tables), pgvector for storage/similarity search, `EmbeddingProvider`
-  abstraction (`app/infrastructure/providers/embedding/base.py`) with a real
+  `POST /v1/rag/search`) — split storage: `RagDocument` (title/source/
+  content) and a slim `RagChunk` (id/document_id/chunk_index/content, no
+  vector) live in `remotesea_rag` (a second Postgres database, kept
+  independent from the Learning Loop's tables); chunk **vectors** live in
+  **Qdrant** (`app/infrastructure/qdrant_client.py`) — `qdrant-client`, the
+  one deliberate exception to this codebase's otherwise raw-`httpx`-only
+  provider convention (Qdrant's collection/query API is meaningfully more
+  complex than a REST completion call). `EmbeddingProvider` abstraction
+  (`app/infrastructure/providers/embedding/base.py`) with a real
   `OllamaEmbeddingProvider` (`nomic-embed-text`, 768-dim) and a
-  `MockEmbeddingProvider` for tests. Ingestion chunks on paragraph/sentence
-  boundaries with overlap (`app/domain/rag/chunker.py`, pure/unit-tested) and
-  embeds in one batched call. **Hybrid retrieval**: `retrieve()` combines
-  pgvector cosine-similarity search with Postgres full-text search
-  (`ts_rank`/`plainto_tsquery`), fused via Reciprocal Rank Fusion
-  (`app/domain/rag/fusion.py`, pure/unit-tested) — a keyword-heavy query no
-  longer has to rely on semantic similarity alone to surface an exact-term
-  match; when the full-text side finds nothing, this degrades to exactly
-  the vector-only ranking. Every returned `distance` is a real cosine
-  distance (computed in Python from the chunk's own embedding when it was
-  only found via full-text, not a mislabeled `ts_rank` score) — verified
-  live: a keyword-heavy query and a semantically-phrased query for the same
-  topic both correctly ranked the matching policy document first.
+  `MockEmbeddingProvider` for tests, unchanged. Ingestion chunks on
+  paragraph/sentence boundaries with overlap (`app/domain/rag/chunker.py`,
+  pure/unit-tested), embeds in one batched call, writes the Postgres rows
+  first then upserts the same chunks into Qdrant (id/vector/payload with
+  document_id/title/source/content denormalized in) — the collection is
+  created automatically on first ingest if it doesn't exist yet
+  (`ensure_collection()`, idempotent). **Hybrid retrieval unchanged in
+  spirit**: `retrieve()` combines Qdrant vector search with Postgres
+  full-text search (`ts_rank`/`plainto_tsquery`), fused via Reciprocal Rank
+  Fusion (`app/domain/rag/fusion.py`, pure/unit-tested). Every returned
+  `distance` is still a real, comparable cosine distance regardless of
+  which side found the chunk — Qdrant's own similarity `score` is converted
+  (`1 - score`) for vector-side matches; a full-text-only match gets its
+  vector fetched from Qdrant in one batched call and its distance computed
+  the same way (never a `ts_rank` value mislabeled as a distance — the
+  original hybrid-search correctness guarantee, preserved through the
+  storage-backend change). A Qdrant failure (auth, network, missing
+  collection) is caught and converted to a clean 502, the same convention
+  used everywhere else in this service, not a bare unhandled 500 — this was
+  a real gap found and fixed while wiring Qdrant in, since RAG search now
+  has a real external network dependency it didn't have before.
+  **Unverified this round**: no real `QDRANT_API_KEY` exists in this
+  environment yet (confirmed a placeholder in chat) — every Qdrant-touching
+  code path was exercised live up to the auth boundary (confirmed via a
+  real `403 Forbidden` from the actual cluster, converted to a clean 502 as
+  designed, not a crash), but no vector was ever actually stored or
+  searched for real. Set a real `QDRANT_API_KEY` and re-ingest to close
+  this gap — old Postgres-only test chunks from before this migration have
+  no corresponding Qdrant point and will only ever be found by the
+  full-text half of hybrid search (by design — not backfilled, see the
+  migration's own "not in scope" note).
 - **Context Builder + routing** (`POST /v1/orchestrator/ask`) — the first
   endpoint that decides what to fetch rather than being told exactly what to
   call. Without an `applicationId`, RAG always runs against the question —
@@ -440,12 +462,15 @@ docker compose up -d postgres
 alembic upgrade head
 
 # RAG's database is a second database on this same Postgres server, created
-# once by hand (the pgvector/pgvector:pg16 image bundles the extension, but
-# CREATE DATABASE + CREATE EXTENSION only need to run once — they don't
-# happen automatically against an existing data volume):
+# once by hand (RagDocument + slim RagChunk metadata/content only — chunk
+# *vectors* live in Qdrant, not here, so this database no longer needs
+# CREATE EXTENSION vector for RAG's own sake):
 docker exec -i $(docker compose ps -q postgres) psql -U ai_service -d postgres -c "CREATE DATABASE remotesea_rag;"
-docker exec -i $(docker compose ps -q postgres) psql -U ai_service -d remotesea_rag -c "CREATE EXTENSION vector;"
 alembic -c alembic_rag.ini upgrade head
+
+# RAG chunk vector storage — a Qdrant Cloud cluster (or self-hosted Qdrant),
+# not a container here. Set QDRANT_URL/QDRANT_API_KEY in .env; the
+# collection is created automatically on first document ingest.
 
 # Ollama runs on the host, not in Docker — the official ollama/ollama image
 # bundles NVIDIA CUDA libraries for GPU inference this machine can't use,

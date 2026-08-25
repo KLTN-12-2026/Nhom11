@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,7 +43,12 @@ async def ingest_document(
     request: IngestDocumentRequest,
     service: RagIngestionService = Depends(_get_ingestion_service),
 ) -> DocumentResponse:
-    document = await service.ingest_document(request.title, request.source, request.content)
+    try:
+        document = await service.ingest_document(request.title, request.source, request.content)
+    except RuntimeError as exc:
+        # RAG DB / Qdrant failure, already logged inside RagIngestionService
+        # — same 502 convention as /v1/inference's equivalent failure path.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return DocumentResponse(
         id=document.id,
         title=document.title,
@@ -66,7 +71,12 @@ async def search(
     request: SearchRequest,
     service: RagRetrievalService = Depends(_get_retrieval_service),
 ) -> list[RetrievedChunkResponse]:
-    results = await service.retrieve(request.query, request.top_k)
+    try:
+        results = await service.retrieve(request.query, request.top_k)
+    except RuntimeError as exc:
+        # RAG DB / Qdrant failure, already logged inside RagRetrievalService
+        # — same 502 convention as /v1/inference's equivalent failure path.
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
     return [
         RetrievedChunkResponse(
             chunk_id=r.chunk_id,

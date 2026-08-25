@@ -5,9 +5,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domain.rag.fusion import cosine_distance, reciprocal_rank_fusion
 from app.domain.rag.retrieved_chunk import RetrievedChunk
+from app.domain.shared.errors import error_message
+from app.infrastructure.config import get_settings
+from app.infrastructure.logging import get_logger
 from app.infrastructure.models.rag_chunk import RagChunk
 from app.infrastructure.models.rag_document import RagDocument
 from app.infrastructure.providers.embedding.base import EmbeddingProvider
+from app.infrastructure.qdrant_client import get_qdrant_client
+
+logger = get_logger(__name__)
 
 # Both candidate lists over-fetch beyond top_k so RRF has enough to fuse
 # from — a chunk ranked, say, 8th by vector similarity but 1st by keyword
@@ -60,10 +66,12 @@ class RagRetrievalService:
     # Never returns the whole knowledge base — top_k caps how much context
     # this can ever inject into a prompt (see the architecture doc: "không
     # đưa toàn bộ knowledge base vào prompt, chỉ retrieve context liên
-    # quan"). Hybrid: cosine-distance vector search (semantic similarity)
-    # plus Postgres full-text search (exact keyword/term matches vector
-    # search alone can under-rank), combined via Reciprocal Rank Fusion —
-    # see domain/rag/fusion.py. `to_tsvector` is computed inline rather than
+    # quan"). Hybrid: Qdrant vector search (semantic similarity) plus
+    # Postgres full-text search (exact keyword/term matches vector search
+    # alone can under-rank), combined via Reciprocal Rank Fusion — see
+    # domain/rag/fusion.py. Chunk vectors live in Qdrant; chunk id/content
+    # live in Postgres too (denormalized) so the full-text half needs no
+    # cross-store round trip. `to_tsvector` is computed inline rather than
     # from an indexed generated column — correct at the current knowledge
     # base's scale, a real but separate follow-up once it grows much larger.
     async def retrieve(self, query: str, top_k: int = 5) -> list[RetrievedChunk]:
@@ -72,52 +80,101 @@ class RagRetrievalService:
         if cached is not None:
             return cached
 
-        [query_embedding] = await self._embedding_provider.embed([query])
-        over_fetch = top_k * _OVER_FETCH_FACTOR
+        # Qdrant is a real external network dependency now (previously this
+        # was a local Postgres query only) — an auth failure, a network
+        # blip, or the collection not existing yet must not surface as a
+        # bare, undetailed 500. Converted to RuntimeError here so the API
+        # layer can map it to a clean 502, the same convention already used
+        # for RAG/LLM failures in OrchestratorService.generate().
+        try:
+            [query_embedding] = await self._embedding_provider.embed([query])
+            over_fetch = top_k * _OVER_FETCH_FACTOR
 
-        # order_by references the distance expression directly without
-        # adding it to the selected columns — RetrievedChunk.distance is
-        # computed in Python from each chunk's own embedding instead (see
-        # _to_retrieved_chunk), so a chunk found only via the FTS query
-        # below still gets a real, comparable cosine distance rather than a
-        # ts_rank score mislabeled as one (this value is returned as-is on
-        # GET /v1/rag/search).
-        vector_distance = RagChunk.embedding.cosine_distance(query_embedding)
-        vector_stmt = (
-            select(RagChunk, RagDocument.title, RagDocument.source)
-            .join(RagDocument, RagChunk.document_id == RagDocument.id)
-            .order_by(vector_distance)
-            .limit(over_fetch)
-        )
+            vector_results = await self._search_vector(query_embedding, over_fetch)
 
-        tsquery = func.plainto_tsquery("english", query)
-        tsvector = func.to_tsvector("english", RagChunk.content)
-        fts_stmt = (
-            select(RagChunk, RagDocument.title, RagDocument.source)
-            .join(RagDocument, RagChunk.document_id == RagDocument.id)
-            .where(tsvector.op("@@")(tsquery))
-            .order_by(func.ts_rank(tsvector, tsquery).desc())
-            .limit(over_fetch)
-        )
-
-        vector_rows = (await self._db.execute(vector_stmt)).all()
-        fts_rows = (await self._db.execute(fts_stmt)).all()
-
-        vector_results = [self._to_retrieved_chunk(row, query_embedding) for row in vector_rows]
-        fts_results = [self._to_retrieved_chunk(row, query_embedding) for row in fts_rows]
+            tsquery = func.plainto_tsquery("english", query)
+            tsvector = func.to_tsvector("english", RagChunk.content)
+            fts_stmt = (
+                select(RagChunk, RagDocument.title, RagDocument.source)
+                .join(RagDocument, RagChunk.document_id == RagDocument.id)
+                .where(tsvector.op("@@")(tsquery))
+                .order_by(func.ts_rank(tsvector, tsquery).desc())
+                .limit(over_fetch)
+            )
+            fts_rows = (await self._db.execute(fts_stmt)).all()
+            fts_results = await self._to_retrieved_chunks_with_distance(fts_rows, query_embedding)
+        except Exception as exc:  # noqa: BLE001 - converted to a clean 502 below
+            message = error_message(exc)
+            logger.warning("RAG retrieval failed: %s", message)
+            raise RuntimeError(message) from exc
 
         result = reciprocal_rank_fusion(vector_results, fts_results, top_k=top_k)
         _cache_set(cache_key, result)
         return result
 
-    @staticmethod
-    def _to_retrieved_chunk(row, query_embedding: list[float]) -> RetrievedChunk:
-        chunk, title, source = row
-        return RetrievedChunk(
-            chunk_id=chunk.id,
-            document_id=chunk.document_id,
-            document_title=title,
-            document_source=source,
-            content=chunk.content,
-            distance=cosine_distance(chunk.embedding, query_embedding),
+    # Qdrant's `score` for a Cosine-distance collection is a similarity
+    # (higher = better match) — the opposite convention from this
+    # codebase's RetrievedChunk.distance (lower = more similar, matching
+    # pgvector's `<=>` and domain/rag/fusion.py's cosine_distance()).
+    # Converted here at the boundary so nothing downstream has to know
+    # which backend produced a result.
+    async def _search_vector(self, query_embedding: list[float], limit: int) -> list[RetrievedChunk]:
+        settings = get_settings()
+        response = await get_qdrant_client().query_points(
+            collection_name=settings.qdrant_collection_name,
+            query=query_embedding,
+            limit=limit,
+            with_payload=True,
         )
+        return [
+            RetrievedChunk(
+                chunk_id=str(point.id),
+                document_id=point.payload["document_id"],
+                document_title=point.payload["document_title"],
+                document_source=point.payload["document_source"],
+                content=point.payload["content"],
+                distance=1.0 - point.score,
+            )
+            for point in response.points
+        ]
+
+    # A chunk found only by the full-text query above has no distance from
+    # that query alone (ts_rank is a relevance rank, not a distance — the
+    # exact "don't mislabel a rank as a distance" bug fixed when hybrid
+    # search was first built). Its vector still exists in Qdrant, so one
+    # batched retrieve() (not one call per chunk) fetches it and computes a
+    # real cosine distance via the same pure function the vector path's
+    # semantics rely on.
+    async def _to_retrieved_chunks_with_distance(
+        self, rows: list, query_embedding: list[float]
+    ) -> list[RetrievedChunk]:
+        if not rows:
+            return []
+        settings = get_settings()
+        records = await get_qdrant_client().retrieve(
+            collection_name=settings.qdrant_collection_name,
+            ids=[chunk.id for chunk, _, _ in rows],
+            with_vectors=True,
+        )
+        vectors_by_id = {str(record.id): record.vector for record in records}
+
+        results = []
+        for chunk, title, source in rows:
+            vector = vectors_by_id.get(chunk.id)
+            # A chunk whose Qdrant point is missing (e.g. the ingest's
+            # Postgres commit succeeded but its Qdrant upsert didn't — see
+            # RagIngestionService) has no vector to compare — 1.0 (maximum
+            # cosine distance) is an honest "least similar" fallback, not a
+            # fabricated close match.
+            distance = cosine_distance(vector, query_embedding) if vector is not None else 1.0
+            results.append(
+                RetrievedChunk(
+                    chunk_id=chunk.id,
+                    document_id=chunk.document_id,
+                    document_title=title,
+                    document_source=source,
+                    content=chunk.content,
+                    distance=distance,
+                )
+            )
+        return results

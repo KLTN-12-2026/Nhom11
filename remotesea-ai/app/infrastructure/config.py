@@ -59,15 +59,25 @@ class Settings(BaseSettings):
     # the main one) on the same Postgres server, per the explicit decision
     # to keep "system knowledge" storage independent from the AI Learning
     # Loop's interaction/feedback/dataset/model tables (see
-    # infrastructure/rag_db.py). Needs the pgvector extension enabled on
-    # this DB.
+    # infrastructure/rag_db.py). Holds RagDocument (title/source/content)
+    # and the slim RagChunk metadata/content rows used for full-text search
+    # — chunk *vectors* live in Qdrant instead (see qdrant_client.py),
+    # not this database, so this DB no longer needs the pgvector extension
+    # for RAG's own sake (the main DB still needs it, for
+    # ai_conversation_turns.embedding — an unrelated feature).
     rag_database_url: str
     embedding_provider: Literal["OLLAMA", "MOCK"] = "OLLAMA"
     ollama_embedding_model: str = "nomic-embed-text"
-    # nomic-embed-text's output dimension — the pgvector column width is
-    # fixed at table-creation time, so this has to be a known constant, not
-    # something read off a live embedding response.
+    # nomic-embed-text's output dimension — Qdrant's collection vector size
+    # is fixed at collection-creation time, so this has to be a known
+    # constant, not something read off a live embedding response.
     embedding_dimensions: int = 768
+    # RAG chunk vector storage/search — see infrastructure/qdrant_client.py.
+    # Qdrant Cloud (a managed cluster), not self-hosted, so this is just a
+    # URL + API key, no docker-compose service.
+    qdrant_url: str
+    qdrant_api_key: str | None = None
+    qdrant_collection_name: str = "remotesea_rag_chunks"
 
 
 # lru_cache, not a module-level instance — same reasoning as NestJS's

@@ -13,6 +13,7 @@ from app.infrastructure import remotesea_api_client
 from app.infrastructure.logging import configure_logging
 from app.infrastructure.providers.embedding.factory import get_embedding_provider
 from app.infrastructure.providers.llm.factory import get_provider
+from app.infrastructure.qdrant_client import get_qdrant_client
 
 configure_logging()
 
@@ -20,9 +21,10 @@ configure_logging()
 # get_provider()/get_embedding_provider() are @lru_cache singletons holding
 # a persistent httpx.AsyncClient each (see infrastructure/providers/*/ollama.py)
 # — this closes those connections on shutdown, same for
-# remotesea_api_client's module-level client. MockProvider/
-# MockEmbeddingProvider hold no client, hence the getattr guard rather than
-# assuming every provider has aclose().
+# remotesea_api_client's module-level client and the Qdrant client
+# (AsyncQdrantClient.close(), not aclose() — hence checking both names).
+# MockProvider/MockEmbeddingProvider hold no client, hence the getattr guard
+# rather than assuming every provider has a close method.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
@@ -33,6 +35,7 @@ async def lifespan(app: FastAPI):
     if aclose := getattr(embedding_provider, "aclose", None):
         await aclose()
     await remotesea_api_client.aclose()
+    await get_qdrant_client().close()
 
 
 app = FastAPI(
