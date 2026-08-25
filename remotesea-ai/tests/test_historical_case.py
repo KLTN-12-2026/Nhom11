@@ -1,4 +1,4 @@
-from app.domain.candidate_analysis.historical_case import build_historical_case
+from app.domain.candidate_analysis.historical_case import build_historical_case, strip_seniority_level
 
 VALID_OUTPUT = {
     "score": 78,
@@ -104,3 +104,23 @@ class TestBuildHistoricalCase:
         assert case is not None
         assert not hasattr(case, "candidate_name")
         assert "Should Not Appear" not in vars(case).values()
+
+
+class TestStripSeniorityLevel:
+    def test_strips_leading_seniority_word(self):
+        assert strip_seniority_level("Senior Backend Engineer") == "Backend Engineer"
+
+    def test_strips_different_seniority_word_to_same_core_role(self):
+        assert strip_seniority_level("Staff Backend Engineer") == "Backend Engineer"
+
+    def test_title_with_no_seniority_word_unchanged(self):
+        assert strip_seniority_level("Backend Engineer") == "Backend Engineer"
+
+    def test_case_insensitive(self):
+        assert strip_seniority_level("SENIOR Backend Engineer") == "Backend Engineer"
+
+    def test_title_that_is_only_a_seniority_word_falls_back_to_original(self):
+        assert strip_seniority_level("Senior") == "Senior"
+
+    def test_strips_multiple_seniority_words(self):
+        assert strip_seniority_level("Senior Staff Product Designer") == "Product Designer"

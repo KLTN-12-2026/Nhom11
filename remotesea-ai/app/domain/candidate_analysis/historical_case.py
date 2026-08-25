@@ -64,3 +64,35 @@ def build_historical_case(
         was_corrected=feedback_action == "EDIT",
         correction_reason=correction_reason,
     )
+
+
+_SENIORITY_WORDS = {
+    "junior",
+    "jr",
+    "mid",
+    "mid-level",
+    "senior",
+    "sr",
+    "staff",
+    "principal",
+    "lead",
+    "entry-level",
+    "entry",
+    "associate",
+}
+
+
+# Pure — used by HistoricalCaseService to widen job-title matching so
+# clearly-related roles at different seniority levels ("Senior Backend
+# Engineer" vs "Staff Backend Engineer") still match each other instead of
+# missing under exact-substring search, which neither contains as a
+# substring of the other. Found against this session's own real historical
+# data: a "Senior Backend Engineer" interaction never surfaced for a new
+# "Staff Backend Engineer" or plain "Backend Engineer" search under the old
+# plain ILIKE — level words are noise for "is this a similar role," not
+# signal. Falls back to the original title if stripping would empty it
+# (e.g. a title that's only a seniority word).
+def strip_seniority_level(title: str) -> str:
+    kept = [word for word in title.split() if word.strip(",-").lower() not in _SENIORITY_WORDS]
+    stripped = " ".join(kept).strip()
+    return stripped or title
