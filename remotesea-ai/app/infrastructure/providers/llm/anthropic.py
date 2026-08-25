@@ -30,6 +30,7 @@ class AnthropicProvider(AiModelProvider):
         if not settings.anthropic_api_key:
             raise ValueError("ANTHROPIC_API_KEY is required when AI_PROVIDER=ANTHROPIC")
         self._model = settings.ai_model
+        self._temperature = settings.ai_temperature
         self._client = httpx.AsyncClient(
             base_url="https://api.anthropic.com",
             timeout=settings.ai_request_timeout_seconds,
@@ -53,6 +54,10 @@ class AnthropicProvider(AiModelProvider):
             "system": system,
             "messages": [{"role": "user", "content": prompt}],
             "stream": stream,
+            # Anthropic defaults to 1.0 — low here for the same reason
+            # Ollama's is: every call is a structured business decision,
+            # not creative text (see Settings.ai_temperature).
+            "temperature": self._temperature,
         }
         if json_schema is not None:
             payload["tools"] = [{"name": _STRUCTURED_OUTPUT_TOOL_NAME, "input_schema": json_schema}]

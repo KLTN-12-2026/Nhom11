@@ -36,6 +36,16 @@ class Settings(BaseSettings):
     # is the slow case this was originally sized for; cloud providers
     # (Anthropic/Gemini) finish well within it in practice.
     ai_request_timeout_seconds: float = 300.0
+    # Low, not each provider's own default (Ollama defaults to 0.8) —
+    # every call this service makes is a structured business decision
+    # (CANDIDATE_ANALYSIS's score/recommendation, tool-selection routing,
+    # ask/chat answers), where consistency matters more than creative
+    # variety. Not 0.0 — a small amount of randomness still lets the model
+    # phrase reasoning naturally; 0.0 on some models produces repetitive or
+    # degenerate text. Shared across all calls (not just CANDIDATE_ANALYSIS)
+    # since every one of them benefits from the same "same input, same
+    # answer" property.
+    ai_temperature: float = 0.2
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
     ollama_base_url: str = "http://localhost:11434"

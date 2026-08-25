@@ -10,19 +10,25 @@ from app.infrastructure.providers.llm.gemini import (
 
 class TestBuildPayload:
     def test_includes_system_and_user_content(self):
-        payload = _build_payload("be helpful", "what is 2+2?", None)
+        payload = _build_payload("be helpful", "what is 2+2?", None, temperature=0.2)
         assert payload["systemInstruction"]["parts"][0]["text"] == "be helpful"
         assert payload["contents"][0]["parts"][0]["text"] == "what is 2+2?"
 
-    def test_omits_generation_config_without_schema(self):
-        payload = _build_payload("system", "prompt", None)
-        assert "generationConfig" not in payload
+    def test_includes_temperature_without_schema(self):
+        payload = _build_payload("system", "prompt", None, temperature=0.2)
+        assert payload["generationConfig"]["temperature"] == 0.2
+        assert "responseSchema" not in payload["generationConfig"]
 
     def test_includes_response_schema_when_given(self):
         schema = {"type": "object", "properties": {"score": {"type": "integer"}}}
-        payload = _build_payload("system", "prompt", schema)
+        payload = _build_payload("system", "prompt", schema, temperature=0.2)
         assert payload["generationConfig"]["responseMimeType"] == "application/json"
         assert payload["generationConfig"]["responseSchema"] == schema
+        assert payload["generationConfig"]["temperature"] == 0.2
+
+    def test_temperature_value_is_passed_through(self):
+        payload = _build_payload("system", "prompt", None, temperature=0.7)
+        assert payload["generationConfig"]["temperature"] == 0.7
 
 
 class TestExtractText:
