@@ -111,11 +111,26 @@ class Settings(BaseSettings):
     # for RAG's own sake (the main DB still needs it, for
     # ai_conversation_turns.embedding — an unrelated feature).
     rag_database_url: str
-    embedding_provider: Literal["OLLAMA", "MOCK"] = "OLLAMA"
+    # OLLAMA (default) needs a real, reachable Ollama daemon — fine for local
+    # dev (docker-compose) but nothing runs one in production unless deployed
+    # separately. CLOUDFLARE is the option for a deployment with no
+    # self-hosted Ollama at all (see CloudflareEmbeddingProvider) — same
+    # account/token as ai_model_provider=CLOUDFLARE, but this is an
+    # independent setting: embedding and text-generation providers don't
+    # have to match.
+    embedding_provider: Literal["OLLAMA", "CLOUDFLARE", "MOCK"] = "OLLAMA"
     ollama_embedding_model: str = "nomic-embed-text"
-    # nomic-embed-text's output dimension — Qdrant's collection vector size
-    # is fixed at collection-creation time, so this has to be a known
-    # constant, not something read off a live embedding response.
+    # Workers AI BGE embedding model id, used only when
+    # embedding_provider=CLOUDFLARE. bge-base-en-v1.5's dimension (768)
+    # matches this service's default embedding_dimensions below, so the
+    # existing Qdrant collection needs no resizing to switch to it.
+    cloudflare_embedding_model: str = "@cf/baai/bge-base-en-v1.5"
+    # nomic-embed-text's (and bge-base-en-v1.5's) output dimension —
+    # Qdrant's collection vector size is fixed at collection-creation time,
+    # so this has to be a known constant, not something read off a live
+    # embedding response. Switching to an embedding model with a different
+    # dimension requires recreating the Qdrant collection, not just changing
+    # this value.
     embedding_dimensions: int = 768
     # RAG chunk vector storage/search — see infrastructure/qdrant_client.py.
     # Qdrant Cloud (a managed cluster), not self-hosted, so this is just a
