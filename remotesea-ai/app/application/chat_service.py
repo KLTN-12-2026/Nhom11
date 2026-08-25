@@ -1,4 +1,5 @@
 import asyncio
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -128,8 +129,21 @@ class ChatService:
             else []
         )
 
+        started_at = time.monotonic()
         result = await self._orchestrator.generate(
             context, bearer_token, request.question, request.application_id, history, related_turns
+        )
+        # orchestrator_service.generate() already logs its own detailed
+        # breakdown (tools/RAG/retry) — this line adds the piece only
+        # ChatService knows: total time including history/related-turn
+        # lookups, and which conversation it belongs to, for chat-specific
+        # latency tracking that /v1/inference already gets via latency_ms.
+        logger.info(
+            "chat_send_message conversation_id=%s elapsed_ms=%d history_turns=%d related_turns=%d",
+            conversation.id,
+            int((time.monotonic() - started_at) * 1000),
+            len(history),
+            len(related_turns),
         )
 
         # Explicit, shared timestamp — AiConversationTurn.created_at's

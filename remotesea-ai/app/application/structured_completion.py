@@ -19,7 +19,11 @@ _MAX_ATTEMPTS = 2
 # retry once on failure" loop. Returns the *last* attempt's raw text
 # alongside the parsed result — parsed is None only if every attempt failed
 # to validate, matching callers' existing "unparseable response" fallback
-# behavior exactly, just with one more try first.
+# behavior exactly, just with one more try first. `attempts` (how many LLM
+# calls it took) is surfaced so callers can log a real reliability signal —
+# a response that only validated on attempt 2 is a genuine, observable
+# structured-output quality issue, not something worth losing once the
+# retry silently succeeds.
 async def complete_structured(
     provider: AiModelProvider,
     model_type: type[T],
@@ -27,12 +31,12 @@ async def complete_structured(
     prompt: str,
     *,
     model: str | None = None,
-) -> tuple[str, T | None]:
+) -> tuple[str, T | None, int]:
     raw = ""
     json_schema = model_type.model_json_schema()
-    for _ in range(_MAX_ATTEMPTS):
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
         raw = await provider.complete(system, prompt, json_schema=json_schema, model=model)
         parsed = parse_json_object(raw, model_type)
         if parsed is not None:
-            return raw, parsed
-    return raw, None
+            return raw, parsed, attempt
+    return raw, None, _MAX_ATTEMPTS

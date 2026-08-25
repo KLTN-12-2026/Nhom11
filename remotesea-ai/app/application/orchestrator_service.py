@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from fastapi import HTTPException
 from pydantic import BaseModel, Field
@@ -158,6 +159,7 @@ class OrchestratorService:
     ) -> AskResponse:
         sources: list[str] = []
         application_data: dict | None = None
+        started_at = time.monotonic()
 
         available_tools = list(_TOOL_CALLS) if application_id else []
         selected_tools, needs_knowledge = await self._select_tools(question, available_tools)
@@ -206,11 +208,34 @@ class OrchestratorService:
             prompt = build_context(context, question, application_data, rag_chunks, history, related_turns)
             # complete_structured retries once on an unparseable response
             # before falling through to the raw-text fallback below.
-            raw, parsed = await complete_structured(self._provider, _ParsedAnswer, ASK_SYSTEM_PROMPT, prompt)
+            raw, parsed, attempts = await complete_structured(
+                self._provider, _ParsedAnswer, ASK_SYSTEM_PROMPT, prompt
+            )
         except Exception as exc:  # noqa: BLE001 - converted to a clean 502 below
             message = error_message(exc)
-            logger.warning("Orchestrator generation failed: %s", message)
+            logger.warning(
+                "orchestrator_generate outcome=error elapsed_ms=%d tools=%s needs_knowledge=%s error=%s",
+                int((time.monotonic() - started_at) * 1000),
+                selected_tools,
+                needs_knowledge,
+                message,
+            )
             raise RuntimeError(message) from exc
+
+        # One structured line per request — everything priority 9 asks for
+        # (latency, tool/RAG usage, retry-driven model calls, outcome) in a
+        # single grep-able record, since neither /ask nor /chat persisted
+        # any of this before (unlike /v1/inference's AiInteraction row).
+        logger.info(
+            "orchestrator_generate outcome=%s elapsed_ms=%d tools=%s needs_knowledge=%s "
+            "rag_chunks=%d llm_attempts=%d",
+            "success" if parsed is not None else "unparsed",
+            int((time.monotonic() - started_at) * 1000),
+            selected_tools,
+            needs_knowledge,
+            len(rag_chunks),
+            attempts,
+        )
 
         if parsed is None:
             # Same "never silently drop the model's output" principle as

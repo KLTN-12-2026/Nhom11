@@ -76,9 +76,15 @@ class RagRetrievalService:
     # from an indexed generated column — correct at the current knowledge
     # base's scale, a real but separate follow-up once it grows much larger.
     async def retrieve(self, query: str, top_k: int = 5) -> list[RetrievedChunk]:
+        started_at = time.monotonic()
         cache_key = (query.strip().lower(), top_k)
         cached = _cache_get(cache_key)
         if cached is not None:
+            logger.info(
+                "rag_retrieve cache=hit elapsed_ms=%d chunks=%d",
+                int((time.monotonic() - started_at) * 1000),
+                len(cached),
+            )
             return cached
 
         # Qdrant is a real external network dependency now (previously this
@@ -108,6 +114,13 @@ class RagRetrievalService:
 
         result = reciprocal_rank_fusion(vector_results, fts_results, top_k=top_k)
         _cache_set(cache_key, result)
+        logger.info(
+            "rag_retrieve cache=miss elapsed_ms=%d vector_candidates=%d fts_candidates=%d chunks=%d",
+            int((time.monotonic() - started_at) * 1000),
+            len(vector_results),
+            len(fts_results),
+            len(result),
+        )
         return result
 
     async def _search_fts(self, query: str, limit: int) -> list:

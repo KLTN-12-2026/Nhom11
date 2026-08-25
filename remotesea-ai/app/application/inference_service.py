@@ -112,7 +112,7 @@ class InferenceService:
             # complete_structured retries once on an unparseable response
             # before giving up — schema-constrained decoding makes this
             # rare, not impossible.
-            raw_output, parsed = await complete_structured(
+            raw_output, parsed, llm_attempts = await complete_structured(
                 self._provider, CandidateAnalysisResult, CANDIDATE_ANALYSIS_SYSTEM, prompt
             )
             if parsed is None:
@@ -125,6 +125,7 @@ class InferenceService:
             parsed = None
             status = AiInteractionStatus.FAILED
             error = message
+            llm_attempts = 0
 
         if parsed is not None:
             consistency_warning = check_score_recommendation_consistency(
@@ -149,6 +150,17 @@ class InferenceService:
                 retrieved_context = {**(retrieved_context or {}), "groundednessWarning": True}
 
         latency_ms = int((time.monotonic() - started_at) * 1000)
+        # One structured line per CANDIDATE_ANALYSIS call — latency_ms is
+        # already persisted on AiInteraction, but rag/historical usage and
+        # retry-driven LLM call count weren't visible anywhere before.
+        logger.info(
+            "candidate_analysis outcome=%s elapsed_ms=%d rag_chunks=%d historical_cases=%d llm_attempts=%d",
+            status.value,
+            latency_ms,
+            len(rag_chunks),
+            len(historical_cases),
+            llm_attempts,
+        )
         interaction = AiInteraction(
             id=str(uuid.uuid4()),
             task=request.task,
