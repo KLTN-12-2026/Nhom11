@@ -16,14 +16,18 @@ class Settings(BaseSettings):
     ai_service_secret: str
     # AiModelProvider selection — see infrastructure/providers/llm/factory.py.
     # OLLAMA is the default: self-hosted, zero API key, zero-config beyond
-    # what's already here. ANTHROPIC/GEMINI are opt-in alternatives, each
-    # requiring their own api key below.
-    ai_provider: Literal["OLLAMA", "ANTHROPIC", "GEMINI", "MOCK"] = "OLLAMA"
-    # Meaning depends on ai_provider: an Ollama tag, an Anthropic model id,
-    # or a Gemini model id. Defaults to today's Ollama default so switching
-    # provider is the only thing that changes for existing Ollama-only
-    # setups; picking ANTHROPIC/GEMINI requires setting this to a model that
-    # provider actually serves — not silently guessed per-provider.
+    # what's already here. ANTHROPIC/GEMINI/CLOUDFLARE are opt-in
+    # alternatives, each requiring their own credentials below.
+    ai_provider: Literal["OLLAMA", "ANTHROPIC", "GEMINI", "CLOUDFLARE", "MOCK"] = "OLLAMA"
+    # Meaning depends on ai_provider: an Ollama tag, an Anthropic model id, a
+    # Gemini model id, or a Cloudflare Workers AI model id (e.g.
+    # "@cf/meta/llama-3.1-8b-instruct"). Defaults to today's Ollama default
+    # so switching provider is the only thing that changes for existing
+    # Ollama-only setups; picking a different provider requires setting this
+    # to a model that provider actually serves — not silently guessed
+    # per-provider. Deliberately one shared field, not a per-provider
+    # <VENDOR>_MODEL variable, so a provider switch is exactly two env vars
+    # (ai_provider + this) regardless of which vendor.
     ai_model: str = "qwen2.5:3b-instruct"
     # Optional override for the tool-selection/RAG-necessity classification
     # call specifically (OrchestratorService._select_tools) — that's a much
@@ -48,6 +52,10 @@ class Settings(BaseSettings):
     ai_temperature: float = 0.2
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
+    # Workers AI: account-scoped, not a single global key — both required
+    # together when ai_provider=CLOUDFLARE (see providers/llm/cloudflare.py).
+    cloudflare_account_id: str | None = None
+    cloudflare_api_token: str | None = None
     ollama_base_url: str = "http://localhost:11434"
     # How long Ollama keeps the model loaded in memory after a request —
     # Ollama's own default is short enough that spaced-out requests can
