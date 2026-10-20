@@ -27,8 +27,7 @@ RemoteSEA kết nối ứng viên (Talent) với nhà tuyển dụng (Employer) 
 
 ## 1. Kiến trúc tổng quan
 
-Hệ thống gồm 3 service độc lập, mỗi service là một repo git riêng:
-
+Hệ thống gồm 3 service độc lập :
 ```
 ┌──────────────────┐   REST + JWT        ┌──────────────────┐   HTTP + shared secret   ┌──────────────────┐
 │  remotesea-web   │ ──────────────────▶ │  remotesea-api   │ ───────────────────────▶ │   remotesea-ai   │
