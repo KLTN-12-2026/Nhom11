@@ -1,0 +1,10 @@
+FROM {{GGUF_PATH}}
+
+# Same system prompt CANDIDATE_ANALYSIS is served with in
+# app/services/inference_service.py's _CANDIDATE_ANALYSIS_SYSTEM — a
+# fine-tuned model should be served with the exact instruction it was
+# trained on, not a paraphrase. deploy_to_ollama.sh substitutes it in.
+SYSTEM """{{SYSTEM_PROMPT}}"""
+
+PARAMETER temperature 0.2
+PARAMETER num_ctx 2048

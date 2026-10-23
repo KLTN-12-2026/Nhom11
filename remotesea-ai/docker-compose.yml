@@ -1,0 +1,48 @@
+services:
+  # This service's own database — deliberately not the remotesea-api Supabase
+  # instance (see README: "AI Service phải là một service độc lập"). Port
+  # 5434 (not 5432/5433 — both already claimed locally by other projects'
+  # Postgres containers on this machine) so it can run alongside them without
+  # colliding.
+  # pgvector/pgvector:pg16, not plain postgres:16-alpine — same Postgres 16
+  # underneath (just the pgvector extension pre-installed), needed for the
+  # RAG database (remotesea_rag, a second database on this same server —
+  # see app/core/rag_database.py) added in Phase 3. Swapping the image is
+  # safe against the existing volume; CREATE EXTENSION vector only needs to
+  # run once inside remotesea_rag afterwards (see README's RAG setup).
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ai_service
+      POSTGRES_PASSWORD: ai_service
+      POSTGRES_DB: remotesea_ai
+    ports:
+      - "5434:5432"
+    volumes:
+      - ai_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ai_service -d remotesea_ai"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ai-service:
+    build: .
+    env_file: .env
+    environment:
+      # Inside Docker's network, "localhost" means the container itself —
+      # override the .env file's host-facing DATABASE_URL to the compose
+      # service name instead. OLLAMA_BASE_URL stays host.docker.internal:11434
+      # (see .env.example) since Ollama runs natively on the host, not as a
+      # container here — its Docker image bundles CUDA libraries for GPU
+      # inference this machine can't use, and was 10GB+ of dead weight on a
+      # disk-constrained dev box for zero benefit over the native binary.
+      DATABASE_URL: postgresql+asyncpg://ai_service:ai_service@postgres:5432/remotesea_ai
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  ai_postgres_data:
