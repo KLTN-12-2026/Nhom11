@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import type { Prisma, Job } from "@prisma/client";
 import { PrismaService } from "@/core/database/prisma.service";
+import { activeJobBaseWhere, facetSelect, type FacetRow } from "./job-search.util";
 
 const jobListInclude = {
   employer: { select: { companyName: true, logoUrl: true, slug: true } },
@@ -9,7 +10,17 @@ const jobListInclude = {
 } satisfies Prisma.JobInclude;
 
 const jobDetailInclude = {
-  employer: { select: { companyName: true, logoUrl: true, slug: true, isVerified: true } },
+  employer: {
+    select: {
+      companyName: true,
+      logoUrl: true,
+      slug: true,
+      isVerified: true,
+      size: true,
+      description: true,
+      hqCountry: true,
+    },
+  },
   categories: { include: { category: true } },
   skills: { include: { skill: true } },
 } satisfies Prisma.JobInclude;
@@ -18,18 +29,27 @@ const jobDetailInclude = {
 export class JobsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  findMany(where: Prisma.JobWhereInput, skip: number, take: number) {
+  findMany(
+    where: Prisma.JobWhereInput,
+    skip: number,
+    take: number,
+    orderBy: Prisma.JobOrderByWithRelationInput[] = [{ isFeatured: "desc" }, { publishedAt: "desc" }]
+  ) {
     return this.prisma.job.findMany({
       where,
       skip,
       take,
-      orderBy: [{ isFeatured: "desc" }, { publishedAt: "desc" }],
+      orderBy,
       include: jobListInclude,
     });
   }
 
   count(where: Prisma.JobWhereInput): Promise<number> {
     return this.prisma.job.count({ where });
+  }
+
+  findFacetRows(): Promise<FacetRow[]> {
+    return this.prisma.job.findMany({ where: activeJobBaseWhere(), select: facetSelect });
   }
 
   findActiveById(id: string) {
