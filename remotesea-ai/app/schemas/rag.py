@@ -1,38 +1,29 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
-from pydantic.alias_generators import to_camel
+from pydantic import Field
 
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.schemas.base import CamelModel
 
 
-class IngestDocumentRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class IngestDocumentRequest(CamelModel):
     title: str
     source: str
     content: str = Field(min_length=1)
 
 
-class DocumentResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class DocumentResponse(CamelModel):
     id: str
     title: str
     source: str
     created_at: datetime
 
 
-class SearchRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class SearchRequest(CamelModel):
     query: str = Field(min_length=1)
     top_k: int = Field(default=5, ge=1, le=20)
 
 
-class RetrievedChunkResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class RetrievedChunkResponse(CamelModel):
     chunk_id: str
     document_id: str
     document_title: str

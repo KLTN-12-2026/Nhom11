@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from app.models.ai_feedback import AiFeedbackAction
+from app.infrastructure.models.ai_feedback import AiFeedbackAction
 from app.schemas.feedback import FeedbackRequest
 
 

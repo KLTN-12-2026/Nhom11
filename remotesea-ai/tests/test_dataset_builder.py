@@ -1,12 +1,12 @@
 from datetime import datetime, timezone
 
-from app.models.ai_feedback import AiFeedback, AiFeedbackAction
-from app.models.ai_interaction import AiInteraction, AiInteractionStatus, AiTask
-from app.services.dataset_builder import (
+from app.domain.dataset.selection import (
     UnsupportedDatasetTaskError,
     build_examples,
     split_examples,
 )
+from app.infrastructure.models.ai_feedback import AiFeedback, AiFeedbackAction
+from app.infrastructure.models.ai_interaction import AiInteraction, AiInteractionStatus, AiTask
 
 VALID_OUTPUT = {
     "score": 78,

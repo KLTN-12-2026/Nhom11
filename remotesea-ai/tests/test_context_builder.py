@@ -1,6 +1,7 @@
+from app.domain.orchestrator.context_builder import build_context
+from app.domain.orchestrator.history_turn import HistoryTurn
+from app.domain.rag.retrieved_chunk import RetrievedChunk
 from app.schemas.orchestrator import OrchestratorContext
-from app.services.context_builder import build_context
-from app.services.rag_retrieval_service import RetrievedChunk
 
 
 def _context(**overrides) -> OrchestratorContext:
@@ -76,3 +77,29 @@ class TestBuildContext:
         knowledge_pos = prompt.index("REMOTESEA KNOWLEDGE")
         question_pos = prompt.index("USER QUESTION")
         assert user_pos < live_pos < knowledge_pos < question_pos
+
+    def test_omits_related_conversations_section_when_absent(self):
+        prompt = build_context(_context(), "question", None, [])
+        assert "RELATED PAST CONVERSATIONS" not in prompt
+
+    def test_includes_related_conversations_section_when_present(self):
+        related = [HistoryTurn(question="What is our notice policy?", answer="48 hours.")]
+        prompt = build_context(_context(), "question", None, [], related_turns=related)
+        assert "RELATED PAST CONVERSATIONS" in prompt
+        assert "What is our notice policy?" in prompt
+
+    def test_related_conversations_distinct_from_current_history(self):
+        history = [HistoryTurn(question="Current Q", answer="Current A")]
+        related = [HistoryTurn(question="Past Q", answer="Past A")]
+        prompt = build_context(_context(), "question", None, [], history=history, related_turns=related)
+        assert "CONVERSATION HISTORY" in prompt
+        assert "RELATED PAST CONVERSATIONS" in prompt
+        history_section = prompt.split("CONVERSATION HISTORY")[1].split("RELATED PAST CONVERSATIONS")[0]
+        assert "Current Q" in history_section
+        assert "Past Q" not in history_section
+
+    def test_related_conversations_truncated_when_oversized(self):
+        related = [HistoryTurn(question=f"Q{i}", answer="y" * 500) for i in range(5)]
+        prompt = build_context(_context(), "question", None, [], related_turns=related)
+        related_section = prompt.split("RELATED PAST CONVERSATIONS")[1]
+        assert len(related_section) < 1500

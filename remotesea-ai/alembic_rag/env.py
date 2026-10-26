@@ -4,13 +4,13 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from app.core.config import get_settings
-from app.core.rag_database import RagBase
+from app.infrastructure.config import get_settings
+from app.infrastructure.rag_db import RagBase
 
 # Import every RAG model module so its table registers on RagBase.metadata
 # before autogenerate compares against it — same reasoning as alembic/env.py
 # for the main database.
-from app.models import rag_chunk, rag_document  # noqa: F401
+from app.infrastructure.models import rag_chunk, rag_document  # noqa: F401
 
 config = context.config
 if config.config_file_name is not None:

@@ -1,16 +1,12 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, model_validator
-from pydantic.alias_generators import to_camel
+from pydantic import model_validator
 
-from app.models.ai_feedback import AiFeedbackAction
-
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.infrastructure.models.ai_feedback import AiFeedbackAction
+from app.schemas.base import CamelModel
 
 
-class FeedbackRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class FeedbackRequest(CamelModel):
     interaction_id: str
     user_id: str
     action: AiFeedbackAction
@@ -28,9 +24,7 @@ class FeedbackRequest(BaseModel):
         return self
 
 
-class FeedbackResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class FeedbackResponse(CamelModel):
     id: str
     interaction_id: str
     action: AiFeedbackAction

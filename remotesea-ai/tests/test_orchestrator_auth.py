@@ -4,8 +4,8 @@ import jwt
 import pytest
 from fastapi import HTTPException
 
-from app.core.config import get_settings
-from app.core.security import require_orchestrator_context
+from app.infrastructure.config import get_settings
+from app.infrastructure.security import require_orchestrator_context
 
 SECRET = "test-secret-for-orchestrator-auth"
 

@@ -1,39 +1,27 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-from pydantic.alias_generators import to_camel
-
-from app.models.ai_interaction import AiTask
-from app.models.ai_model import AiModelStatus
-
-_CAMEL_CONFIG = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+from app.infrastructure.models.ai_interaction import AiTask
+from app.infrastructure.models.ai_model import AiModelStatus
+from app.schemas.base import CamelModel
 
 
-class RegisterTrainingRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class RegisterTrainingRequest(CamelModel):
     task: AiTask
     name: str
     base_model: str
     dataset_version: int
 
 
-class CompleteTrainingRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class CompleteTrainingRequest(CamelModel):
     artifact_path: str
 
 
-class SubmitEvaluationRequest(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class SubmitEvaluationRequest(CamelModel):
     metrics: dict[str, Any]
     passed: bool
 
 
-class ModelResponse(BaseModel):
-    model_config = _CAMEL_CONFIG
-
+class ModelResponse(CamelModel):
     id: str
     task: str
     version: int

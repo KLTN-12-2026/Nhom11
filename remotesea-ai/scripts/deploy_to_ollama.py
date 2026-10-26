@@ -36,7 +36,7 @@ import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from app.services.inference_service import _CANDIDATE_ANALYSIS_SYSTEM  # noqa: E402
+from app.domain.candidate_analysis.prompts import CANDIDATE_ANALYSIS_SYSTEM  # noqa: E402
 
 _TEMPLATE_PATH = Path(__file__).resolve().parent.parent / "ollama" / "Modelfile.template"
 
@@ -98,7 +98,7 @@ def render_modelfile(from_source: str) -> str:
     template = _TEMPLATE_PATH.read_text()
     return (
         template.replace("{{GGUF_PATH}}", from_source)
-        .replace("{{SYSTEM_PROMPT}}", _CANDIDATE_ANALYSIS_SYSTEM)
+        .replace("{{SYSTEM_PROMPT}}", CANDIDATE_ANALYSIS_SYSTEM)
     )
 
 
@@ -112,7 +112,7 @@ def create_ollama_model(model_name: str, from_source: str) -> None:
     subprocess.run(["ollama", "create", model_name, "-f", modelfile_path], check=True)
     print(f"Done. Deployed as Ollama model '{model_name}'.")
     print(
-        "Note: OllamaProvider still reads a fixed OLLAMA_MODEL from .env — "
+        "Note: OllamaProvider still reads a fixed AI_MODEL from .env — "
         "point it at this tag manually to actually serve it (see README's "
         "known-gap note on dynamic model selection)."
     )

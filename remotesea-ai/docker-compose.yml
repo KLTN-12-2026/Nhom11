@@ -5,11 +5,12 @@ services:
   # Postgres containers on this machine) so it can run alongside them without
   # colliding.
   # pgvector/pgvector:pg16, not plain postgres:16-alpine — same Postgres 16
-  # underneath (just the pgvector extension pre-installed), needed for the
-  # RAG database (remotesea_rag, a second database on this same server —
-  # see app/core/rag_database.py) added in Phase 3. Swapping the image is
-  # safe against the existing volume; CREATE EXTENSION vector only needs to
-  # run once inside remotesea_rag afterwards (see README's RAG setup).
+  # underneath (just the pgvector extension pre-installed). RAG chunk
+  # *vectors* now live in Qdrant (app/infrastructure/qdrant_client.py), not
+  # here — remotesea_rag only needs this image for its regular tables
+  # (RagDocument, the slim RagChunk metadata/content rows). Kept anyway:
+  # the main database (remotesea_ai)'s ai_conversation_turns.embedding —
+  # chat cross-session grounding, unrelated to RAG — still needs pgvector.
   postgres:
     image: pgvector/pgvector:pg16
     environment:
@@ -31,13 +32,19 @@ services:
     env_file: .env
     environment:
       # Inside Docker's network, "localhost" means the container itself —
-      # override the .env file's host-facing DATABASE_URL to the compose
-      # service name instead. OLLAMA_BASE_URL stays host.docker.internal:11434
-      # (see .env.example) since Ollama runs natively on the host, not as a
-      # container here — its Docker image bundles CUDA libraries for GPU
-      # inference this machine can't use, and was 10GB+ of dead weight on a
-      # disk-constrained dev box for zero benefit over the native binary.
+      # override the .env file's host-facing DATABASE_URL/RAG_DATABASE_URL
+      # to the compose service name instead. RAG_DATABASE_URL was missed
+      # when RAG was added (code-review finding) — without this override the
+      # container would still resolve it to .env's localhost:5434, breaking
+      # every RAG-touching call in this containerized deploy path even
+      # though local (non-docker) dev works fine and masks the bug.
+      # OLLAMA_BASE_URL stays host.docker.internal:11434 (see .env.example)
+      # since Ollama runs natively on the host, not as a container here —
+      # its Docker image bundles CUDA libraries for GPU inference this
+      # machine can't use, and was 10GB+ of dead weight on a disk-constrained
+      # dev box for zero benefit over the native binary.
       DATABASE_URL: postgresql+asyncpg://ai_service:ai_service@postgres:5432/remotesea_ai
+      RAG_DATABASE_URL: postgresql+asyncpg://ai_service:ai_service@postgres:5432/remotesea_rag
     ports:
       - "8000:8000"
     depends_on:
