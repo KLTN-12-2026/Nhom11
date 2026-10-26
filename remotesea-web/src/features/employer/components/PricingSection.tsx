@@ -98,7 +98,7 @@ export const PricingSection = () => {
           </p>
           <h2 className="text-[36px] font-semibold tracking-tight text-neutral-900">
             One-time, not{" "}
-            <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+            <em className="font-serif-italic text-brand-700">
               subscription.
             </em>
           </h2>

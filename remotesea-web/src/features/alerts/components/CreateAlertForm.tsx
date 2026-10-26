@@ -78,6 +78,7 @@ export const CreateAlertForm = ({ onCreate }: CreateAlertFormProps) => {
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <input
+            aria-label="Alert name"
             className={INPUT_FIELD_CLASS}
             placeholder="Alert name (e.g. Senior remote engineering)"
             {...register("name")}
@@ -85,11 +86,12 @@ export const CreateAlertForm = ({ onCreate }: CreateAlertFormProps) => {
           {errors.name && <p className="mt-1 text-[12px] text-red-600">{errors.name.message}</p>}
         </div>
         <input
+          aria-label="Keywords"
           className={INPUT_FIELD_CLASS}
           placeholder="Keywords (optional)"
           {...register("keywords")}
         />
-        <select className={INPUT_FIELD_CLASS} {...register("jobType")}>
+        <select aria-label="Job type" className={INPUT_FIELD_CLASS} {...register("jobType")}>
           <option value="">Any job type</option>
           {JOB_TYPES.map((jobType) => (
             <option key={jobType} value={jobType}>
@@ -97,7 +99,7 @@ export const CreateAlertForm = ({ onCreate }: CreateAlertFormProps) => {
             </option>
           ))}
         </select>
-        <select className={INPUT_FIELD_CLASS} {...register("level")}>
+        <select aria-label="Seniority level" className={INPUT_FIELD_CLASS} {...register("level")}>
           <option value="">Any level</option>
           {LEVELS.map((level) => (
             <option key={level} value={level}>
@@ -106,13 +108,14 @@ export const CreateAlertForm = ({ onCreate }: CreateAlertFormProps) => {
           ))}
         </select>
         <input
+          aria-label="Minimum salary"
           className={INPUT_FIELD_CLASS}
           min={0}
           placeholder="Min salary (USD/mo, optional)"
           type="number"
           {...register("salaryMin")}
         />
-        <select className={INPUT_FIELD_CLASS} {...register("frequency")}>
+        <select aria-label="Notification frequency" className={INPUT_FIELD_CLASS} {...register("frequency")}>
           {FREQUENCIES.map((frequency) => (
             <option key={frequency} value={frequency}>
               {frequency.toLowerCase()}
@@ -127,6 +130,7 @@ export const CreateAlertForm = ({ onCreate }: CreateAlertFormProps) => {
             const isSelected = categoryIds.includes(category.id);
             return (
               <button
+                aria-pressed={isSelected}
                 className={cn(
                   "rounded-full border px-3 py-1 text-[12px] transition-colors",
                   isSelected

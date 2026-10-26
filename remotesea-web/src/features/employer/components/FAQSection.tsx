@@ -39,7 +39,7 @@ export const FAQSection = () => {
         <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">FAQ</p>
         <h2 className="mb-10 text-[32px] font-semibold tracking-tight text-neutral-900">
           Honest{" "}
-          <em className="font-serif italic text-brand-700" style={{ fontFamily: "var(--font-serif)" }}>
+          <em className="font-serif-italic text-brand-700">
             answers.
           </em>
         </h2>

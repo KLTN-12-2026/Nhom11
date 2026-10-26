@@ -296,10 +296,7 @@ export const HomePage = () => {
           </div>
           <h2 className="mb-10 text-[32px] font-semibold tracking-tight text-neutral-900">
             Built by someone who&apos;s{" "}
-            <em
-              className="font-serif italic text-brand-700"
-              style={{ fontFamily: "var(--font-serif)" }}
-            >
+            <em className="font-serif-italic text-brand-700">
               actually done it.
             </em>
           </h2>

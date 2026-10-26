@@ -30,6 +30,7 @@ export const AlertListItem = ({ alert, onToggleActive, onDelete }: AlertListItem
       <p className="truncate text-[12px] text-neutral-400">{summarizeAlert(alert)}</p>
     </div>
     <button
+      aria-pressed={alert.isActive}
       className={cn(
         "rounded-full px-2.5 py-1 text-[11px] font-medium",
         alert.isActive ? "bg-brand-50 text-brand-700" : "bg-neutral-100 text-neutral-500"
