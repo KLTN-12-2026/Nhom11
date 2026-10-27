@@ -3,7 +3,6 @@ import type { JobStatus, PlanType } from "@/types/job";
 
 export type EmployerProfile = {
   id: string;
-  userId: string;
   companyName: string;
   slug: string;
   logoUrl: string | null;

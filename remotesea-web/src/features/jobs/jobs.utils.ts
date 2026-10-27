@@ -1,3 +1,5 @@
+import { pickColorFromString } from "@/utils/color";
+import { formatRelativeTime } from "@/utils/time";
 import type { ExperienceLevel, JobType } from "@/types/job";
 
 export const LEVEL_LABELS: Record<ExperienceLevel, string> = {
@@ -37,11 +39,7 @@ const COMPANY_COLORS = [
   "#B45309",
 ];
 
-export const companyColor = (name: string): string => {
-  let hash = 0;
-  for (let i = 0; i < name.length; i += 1) hash += name.charCodeAt(i);
-  return COMPANY_COLORS[hash % COMPANY_COLORS.length];
-};
+export const companyColor = (name: string): string => pickColorFromString(name, COMPANY_COLORS);
 
 export const countryFlag = (country: string | null): string => {
   if (!country) return "🌏";
@@ -52,14 +50,6 @@ export const isAsyncTimezone = (timezone: string | null): boolean =>
   timezone?.toLowerCase().includes("async") ?? false;
 
 export const MS_PER_DAY = 86_400_000;
-const MS_PER_HOUR = 3_600_000;
 
-export const timeAgo = (dateString: string | null): string => {
-  if (!dateString) return "just now";
-  const diff = Date.now() - new Date(dateString).getTime();
-  const days = Math.floor(diff / MS_PER_DAY);
-  if (days >= 1) return `${days}d`;
-  const hours = Math.floor(diff / MS_PER_HOUR);
-  if (hours >= 1) return `${hours}h`;
-  return "just now";
-};
+export const timeAgo = (dateString: string | null): string =>
+  formatRelativeTime(dateString, { day: "d", hour: "h", now: "just now" });

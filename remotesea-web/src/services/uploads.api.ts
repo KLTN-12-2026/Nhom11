@@ -9,6 +9,7 @@ export const uploadViaPresign = async (file: File, type: UploadType): Promise<st
     type,
     filename: file.name,
     contentType: file.type,
+    fileSize: file.size,
   });
 
   const response = await fetch(data.uploadUrl, {

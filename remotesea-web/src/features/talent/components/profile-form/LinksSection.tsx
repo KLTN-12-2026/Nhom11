@@ -6,7 +6,12 @@ import type { ProfileFormValues } from "@/features/talent/talent.schemas";
 
 const LINK_FIELDS = [
   { icon: Code2, label: "GitHub", field: "githubUrl" as const, placeholder: "github.com/you" },
-  { icon: User, label: "LinkedIn", field: "linkedinUrl" as const, placeholder: "linkedin.com/in/you" },
+  {
+    icon: User,
+    label: "LinkedIn",
+    field: "linkedinUrl" as const,
+    placeholder: "linkedin.com/in/you",
+  },
   {
     icon: Globe,
     label: "Portfolio / personal site",
@@ -41,7 +46,9 @@ export const LinksSection = ({ register, resumeUrl, onResumeUploaded }: LinksSec
           <Briefcase size={15} />
         </span>
         <div className="min-w-0 flex-1 space-y-1">
-          <label className="block text-[12px] font-medium text-neutral-700">CV / Resume (PDF)</label>
+          <label className="block text-[12px] font-medium text-neutral-700">
+            CV / Resume (PDF)
+          </label>
           <FileUpload
             accept="application/pdf"
             label="Upload CV"

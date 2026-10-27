@@ -8,7 +8,12 @@ export const listSavedJobs = async (): Promise<SavedJob[]> => {
   return data;
 };
 
-export const toggleSavedJob = async (jobId: string): Promise<{ saved: boolean }> => {
-  const { data } = await apiClient.post<{ saved: boolean }>("/saved", { jobId });
+export const saveJob = async (jobId: string): Promise<{ saved: boolean }> => {
+  const { data } = await apiClient.put<{ saved: boolean }>(`/saved/${jobId}`);
+  return data;
+};
+
+export const unsaveJob = async (jobId: string): Promise<{ saved: boolean }> => {
+  const { data } = await apiClient.delete<{ saved: boolean }>(`/saved/${jobId}`);
   return data;
 };

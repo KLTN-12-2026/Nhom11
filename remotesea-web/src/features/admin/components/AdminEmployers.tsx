@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { memo, useCallback, useState } from "react";
 import { Briefcase, Building, Search, Shield, Wallet } from "lucide-react";
-import { useToast } from "@/components/ui/toast";
 import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
 import { EmptyRow } from "@/components/shared/EmptyRow";
-import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
+import { PillToggle } from "@/components/shared/PillToggle";
+import { CompanyLogo } from "@/components/ui/company-logo";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { useAdminEmployers, useUpdateAdminEmployer } from "@/features/admin/admin.queries";
 import { colorFor } from "@/features/admin/admin.utils";
+import type { AdminEmployer } from "@/types/admin";
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -15,8 +17,82 @@ const FILTERS = [
 const CENTS_PER_DOLLAR = 100;
 const DOLLARS_PER_THOUSAND = 1000;
 
+interface EmployerRowProps {
+  employer: AdminEmployer;
+  maxSpend: number;
+  isPending: boolean;
+  onStatusChange: (id: string, action: "verify" | "suspend") => void;
+}
+
+const EmployerRow = memo(function EmployerRow({
+  employer: e,
+  maxSpend,
+  isPending,
+  onStatusChange,
+}: EmployerRowProps) {
+  return (
+    <div
+      className="grid items-center border-b border-neutral-50 px-5 py-4 transition-colors last:border-0 hover:bg-neutral-50"
+      style={{ gridTemplateColumns: "1fr 90px 140px 100px 32px" }}
+    >
+      <div className="flex items-center gap-3">
+        <CompanyLogo
+          color={colorFor(e.companyName)}
+          initial={e.companyName.charAt(0).toUpperCase()}
+          size={38}
+        />
+        <div>
+          <div className="flex items-center gap-1.5 text-[14px] font-semibold text-neutral-900">
+            {e.companyName}
+            <VerifiedBadge isVerified={e.isVerified} />
+          </div>
+          <div className="text-[12px] text-neutral-400">
+            {e.user.email} · {e.hqCountry ?? "—"}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-1 text-[14px] font-semibold text-neutral-900">
+        <Briefcase className="text-neutral-300" size={12} /> {e.jobCount}
+      </div>
+      <div>
+        <div className="mb-1 font-mono text-[13px] font-semibold text-neutral-900">
+          ${(e.totalSpend / CENTS_PER_DOLLAR).toLocaleString()}
+        </div>
+        <div className="h-1 overflow-hidden rounded-full bg-neutral-100">
+          <div
+            className="h-full rounded-full bg-brand-600"
+            style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }}
+          />
+        </div>
+      </div>
+      <span className="text-[13px] text-neutral-400">
+        {new Date(e.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+      </span>
+      {e.isVerified ? (
+        <button
+          className="rounded-6 border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
+          disabled={isPending}
+          type="button"
+          onClick={() => onStatusChange(e.id, "suspend")}
+        >
+          Suspend
+        </button>
+      ) : (
+        <button
+          className="rounded-6 border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-60"
+          disabled={isPending}
+          type="button"
+          onClick={() => onStatusChange(e.id, "verify")}
+        >
+          Verify
+        </button>
+      )}
+    </div>
+  );
+});
+
 export const AdminEmployers = () => {
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const { data, isLoading } = useAdminEmployers();
   const updateEmployerMutation = useUpdateAdminEmployer();
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
@@ -24,17 +100,16 @@ export const AdminEmployers = () => {
 
   const employers = data?.employers ?? [];
 
-  const updateEmployerStatus = async (id: string, action: "verify" | "suspend") => {
-    try {
-      await updateEmployerMutation.mutateAsync({ id, action });
-      toast({
-        variant: action === "verify" ? "success" : "info",
-        title: action === "verify" ? "Employer verified" : "Employer suspended",
-      });
-    } catch {
-      toast({ variant: "error", title: "Couldn't update employer" });
-    }
-  };
+  const { mutateAsync: updateEmployer } = updateEmployerMutation;
+  const updateEmployerStatus = useCallback(
+    (id: string, action: "verify" | "suspend") =>
+      runWithToast(() => updateEmployer({ id, action }), {
+        success: action === "verify" ? "Employer verified" : "Employer suspended",
+        successVariant: action === "verify" ? "success" : "info",
+        error: "Couldn't update employer",
+      }),
+    [updateEmployer, runWithToast]
+  );
 
   const rows = employers.filter((e) => {
     if (filter === "unverified" && e.isVerified) return false;
@@ -42,7 +117,10 @@ export const AdminEmployers = () => {
     return true;
   });
 
-  const counts = { all: employers.length, unverified: employers.filter((e) => !e.isVerified).length };
+  const counts = {
+    all: employers.length,
+    unverified: employers.filter((e) => !e.isVerified).length,
+  };
   const totalSpendCents = employers.reduce((a, e) => a + e.totalSpend, 0);
   const totalListings = employers.reduce((a, e) => a + e.jobCount, 0);
   const maxSpend = Math.max(1, ...employers.map((e) => e.totalSpend));
@@ -52,7 +130,9 @@ export const AdminEmployers = () => {
   return (
     <div className="flex-1 overflow-hidden">
       <div className="mb-6">
-        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">Operations</p>
+        <p className="mb-0.5 text-[11px] font-semibold uppercase tracking-widest text-neutral-400">
+          Operations
+        </p>
         <h1 className="text-[26px] font-semibold text-neutral-900">Employers</h1>
         <p className="mt-1 text-sm text-neutral-500">
           {employers.length} companies · {totalListings} total listings · $
@@ -63,8 +143,19 @@ export const AdminEmployers = () => {
       {/* KPIs */}
       <div className="mb-6 grid grid-cols-3 gap-3">
         {[
-          { icon: <Building size={14} />, label: "Total employers", val: employers.length, sub: "all time" },
-          { icon: <Shield size={14} />, label: "Unverified", val: counts.unverified, sub: "need review", warn: counts.unverified > 0 },
+          {
+            icon: <Building size={14} />,
+            label: "Total employers",
+            val: employers.length,
+            sub: "all time",
+          },
+          {
+            icon: <Shield size={14} />,
+            label: "Unverified",
+            val: counts.unverified,
+            sub: "need review",
+            warn: counts.unverified > 0,
+          },
           {
             icon: <Wallet size={14} />,
             label: "Total billed",
@@ -76,7 +167,11 @@ export const AdminEmployers = () => {
             <div className="mb-2 flex items-center gap-1.5 text-[12px] text-neutral-400">
               {s.icon} {s.label}
             </div>
-            <div className={`text-[22px] font-semibold ${s.warn ? "text-amber-600" : "text-neutral-900"}`}>{s.val}</div>
+            <div
+              className={`text-[22px] font-semibold ${s.warn ? "text-amber-600" : "text-neutral-900"}`}
+            >
+              {s.val}
+            </div>
             <div className="mt-0.5 text-[11px] text-neutral-400">{s.sub}</div>
           </div>
         ))}
@@ -86,16 +181,24 @@ export const AdminEmployers = () => {
       <div className="mb-4 flex items-center gap-3">
         <div className="flex gap-1">
           {FILTERS.map((f) => (
-            <button
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-colors ${filter === f.id ? "bg-brand-600 text-white" : "border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"}`}
+            <PillToggle
+              active={filter === f.id}
+              activeClassName="bg-brand-600 text-white"
+              className="px-3.5 py-1.5 text-[13px] font-medium transition-colors"
+              inactiveClassName="border border-neutral-200 bg-white text-neutral-600 hover:bg-neutral-50"
               key={f.id}
               onClick={() => setFilter(f.id)}
             >
-              {f.label} <span className={`ml-1 text-[11px] ${filter === f.id ? "text-white/70" : "text-neutral-400"}`}>{counts[f.id]}</span>
-            </button>
+              {f.label}{" "}
+              <span
+                className={`ml-1 text-[11px] ${filter === f.id ? "text-white/70" : "text-neutral-400"}`}
+              >
+                {counts[f.id]}
+              </span>
+            </PillToggle>
           ))}
         </div>
-        <div className="ml-auto flex h-9 items-center gap-2 rounded-10 border border-neutral-200 bg-white px-3">
+        <div className="rounded-10 ml-auto flex h-9 items-center gap-2 border border-neutral-200 bg-white px-3">
           <Search className="text-neutral-400" size={14} />
           <input
             aria-label="Search employers"
@@ -123,57 +226,13 @@ export const AdminEmployers = () => {
           <EmptyRow>No employers match this filter.</EmptyRow>
         ) : (
           rows.map((e) => (
-            <div
-              className="grid items-center border-b border-neutral-50 px-5 py-4 transition-colors last:border-0 hover:bg-neutral-50"
+            <EmployerRow
+              employer={e}
+              isPending={updateEmployerMutation.isPending}
               key={e.id}
-              style={{ gridTemplateColumns: "1fr 90px 140px 100px 32px" }}
-            >
-              <div className="flex items-center gap-3">
-                <CompanyInitial color={colorFor(e.companyName)} name={e.companyName} />
-                <div>
-                  <div className="flex items-center gap-1.5 text-[14px] font-semibold text-neutral-900">
-                    {e.companyName}
-                    <VerifiedBadge isVerified={e.isVerified} />
-                  </div>
-                  <div className="text-[12px] text-neutral-400">
-                    {e.user.email} · {e.hqCountry ?? "—"}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1 text-[14px] font-semibold text-neutral-900">
-                <Briefcase className="text-neutral-300" size={12} /> {e.jobCount}
-              </div>
-              <div>
-                <div className="mb-1 font-mono text-[13px] font-semibold text-neutral-900">
-                  ${(e.totalSpend / CENTS_PER_DOLLAR).toLocaleString()}
-                </div>
-                <div className="h-1 overflow-hidden rounded-full bg-neutral-100">
-                  <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.round((e.totalSpend / maxSpend) * 100)}%` }} />
-                </div>
-              </div>
-              <span className="text-[13px] text-neutral-400">
-                {new Date(e.createdAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-              </span>
-              {e.isVerified ? (
-                <button
-                  className="rounded-6 border border-neutral-200 px-2 py-1 text-[11px] font-medium text-neutral-500 transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
-                  disabled={updateEmployerMutation.isPending}
-                  type="button"
-                  onClick={() => updateEmployerStatus(e.id, "suspend")}
-                >
-                  Suspend
-                </button>
-              ) : (
-                <button
-                  className="rounded-6 border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-700 transition-colors hover:bg-brand-100 disabled:opacity-60"
-                  disabled={updateEmployerMutation.isPending}
-                  type="button"
-                  onClick={() => updateEmployerStatus(e.id, "verify")}
-                >
-                  Verify
-                </button>
-              )}
-            </div>
+              maxSpend={maxSpend}
+              onStatusChange={updateEmployerStatus}
+            />
           ))
         )}
       </div>

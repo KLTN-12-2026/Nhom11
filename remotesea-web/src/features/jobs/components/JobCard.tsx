@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { Bookmark, Clock, RefreshCw, ShieldCheck, Star } from "lucide-react";
 import { CompanyLogo } from "@/components/ui/company-logo";
@@ -21,7 +22,7 @@ interface JobCardProps {
   job: Job;
 }
 
-export const JobCard = ({ job }: JobCardProps) => {
+export const JobCard = memo(function JobCard({ job }: JobCardProps) {
   const { saved, statusUnknown, toggle } = useSavedJobToggle(job.id, ROUTES.jobs);
 
   const country = job.country ?? "Remote";
@@ -106,4 +107,4 @@ export const JobCard = ({ job }: JobCardProps) => {
       </div>
     </Link>
   );
-};
+});

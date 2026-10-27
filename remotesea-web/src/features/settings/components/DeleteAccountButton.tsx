@@ -1,19 +1,18 @@
 import { useState } from "react";
-import { useToast } from "@/components/ui/toast";
+import { useToastMutation } from "@/hooks/useToastMutation";
 import { useDeleteMyAccount } from "@/features/users/users.queries";
 
 export const DeleteAccountButton = () => {
-  const { toast } = useToast();
+  const runWithToast = useToastMutation();
   const [isConfirming, setIsConfirming] = useState(false);
   const deleteAccountMutation = useDeleteMyAccount();
 
   const handleDelete = async () => {
-    try {
-      await deleteAccountMutation.mutateAsync();
-    } catch {
-      toast({ variant: "error", title: "Couldn't delete account", description: "Please try again." });
-      setIsConfirming(false);
-    }
+    await runWithToast(() => deleteAccountMutation.mutateAsync(), {
+      error: "Couldn't delete account",
+      errorDescription: "Please try again.",
+    });
+    setIsConfirming(false);
   };
 
   if (!isConfirming) {

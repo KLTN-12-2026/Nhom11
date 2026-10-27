@@ -1,7 +1,8 @@
 import type { UseFormRegister } from "react-hook-form";
 import { SectionHead, EMPHASIS_STYLE } from "@/features/talent/components/profile-form/SectionHead";
 import { SELECT_INPUT_CLASS, TEXT_INPUT_CLASS } from "@/features/talent/components/profile-form/profile-form.constants";
-import { TIMEZONE_OPTIONS, type ProfileFormValues } from "@/features/talent/talent.schemas";
+import { TIMEZONE_OPTIONS } from "@/features/talent/talent.constants";
+import type { ProfileFormValues } from "@/features/talent/talent.schemas";
 
 interface BasicsSectionProps {
   register: UseFormRegister<ProfileFormValues>;

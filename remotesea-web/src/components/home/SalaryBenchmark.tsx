@@ -1,13 +1,16 @@
 import { Link } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
-import { useSalaryBenchmarks } from "@/features/salary/salary.queries";
+import type { SalaryBenchmark as SalaryBenchmarkData } from "@/features/salary/salary.api";
 import { BenchBar } from "@/components/home/BenchBar";
 import { ROUTES } from "@/constants/routes";
 
 const MIN_GLOBAL_MAX = 1;
 
-export const SalaryBenchmark = () => {
-  const { data: benches } = useSalaryBenchmarks();
+interface SalaryBenchmarkProps {
+  benches: SalaryBenchmarkData[] | undefined;
+}
+
+export const SalaryBenchmark = ({ benches }: SalaryBenchmarkProps) => {
   if (!benches || benches.length === 0) return null;
 
   const totalPoints = benches.reduce((a, b) => a + b.count, 0);

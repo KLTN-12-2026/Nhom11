@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { CompanyLogo } from "@/components/ui/company-logo";
@@ -18,6 +18,41 @@ const STATUS_MAP: Record<AppStatusBucket, { label: string; cls: string }> = {
 };
 
 type TabId = "all" | "active" | "offers" | "closed";
+
+interface ApplicationRowProps {
+  application: ApplicationWithJob;
+}
+
+const ApplicationRow = memo(function ApplicationRow({ application: a }: ApplicationRowProps) {
+  const bucket = STATUS_TO_BUCKET[a.status];
+  const s = STATUS_MAP[bucket];
+  const company = a.job.employer.companyName;
+  const country = a.job.country ?? "Remote";
+  return (
+    <Link
+      className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-neutral-50 px-5 py-3.5 transition-colors last:border-none hover:bg-neutral-50/60"
+      to={`/jobs/${a.jobId}`}
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        <CompanyLogo color={companyColor(company)} initial={company.charAt(0).toUpperCase()} size={36} />
+        <div className="min-w-0">
+          <p className="truncate text-[13.5px] font-medium text-neutral-900">{a.job.title}</p>
+          <p className="text-[12px] text-neutral-400">
+            {company} · {countryFlag(a.job.country)} {country}
+          </p>
+        </div>
+      </div>
+      <span className={cn("inline-flex w-[100px] items-center justify-center rounded-full px-2.5 py-0.5 text-[11.5px] font-medium", s.cls)}>
+        {s.label}
+      </span>
+      <span className="hidden w-[140px] text-[12px] text-neutral-500 md:block">{STAGE_LABEL[a.status]}</span>
+      <span className="hidden w-[72px] text-right text-[12px] text-neutral-400 md:block">
+        {new Date(a.appliedAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })}
+      </span>
+      <ChevronRight className="h-5 w-5 flex-shrink-0 text-neutral-300" />
+    </Link>
+  );
+});
 
 interface ApplicationsTableProps {
   applications: ApplicationWithJob[];
@@ -85,39 +120,9 @@ export const ApplicationsTable = ({ applications }: ApplicationsTableProps) => {
             <span className="hidden w-[72px] text-right md:block">Applied</span>
             <span className="w-5" />
           </div>
-          {filtered.map((a) => {
-            const bucket = STATUS_TO_BUCKET[a.status];
-            const s = STATUS_MAP[bucket];
-            const company = a.job.employer.companyName;
-            const country = a.job.country ?? "Remote";
-            return (
-              <Link
-                className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-4 border-b border-neutral-50 px-5 py-3.5 transition-colors last:border-none hover:bg-neutral-50/60"
-                key={a.id}
-                to={`/jobs/${a.jobId}`}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <CompanyLogo color={companyColor(company)} initial={company.charAt(0).toUpperCase()} size={36} />
-                  <div className="min-w-0">
-                    <p className="truncate text-[13.5px] font-medium text-neutral-900">{a.job.title}</p>
-                    <p className="text-[12px] text-neutral-400">
-                      {company} · {countryFlag(a.job.country)} {country}
-                    </p>
-                  </div>
-                </div>
-                <span className={cn("inline-flex w-[100px] items-center justify-center rounded-full px-2.5 py-0.5 text-[11.5px] font-medium", s.cls)}>
-                  {s.label}
-                </span>
-                <span className="hidden w-[140px] text-[12px] text-neutral-500 md:block">
-                  {STAGE_LABEL[a.status]}
-                </span>
-                <span className="hidden w-[72px] text-right text-[12px] text-neutral-400 md:block">
-                  {new Date(a.appliedAt).toLocaleDateString("en-US", { month: "short", day: "2-digit" })}
-                </span>
-                <ChevronRight className="h-5 w-5 flex-shrink-0 text-neutral-300" />
-              </Link>
-            );
-          })}
+          {filtered.map((a) => (
+            <ApplicationRow application={a} key={a.id} />
+          ))}
         </div>
       )}
     </div>

@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 import { cn } from "@/utils/cn";
 import { useToast } from "@/components/ui/toast";
 import { SkillTagEditor } from "@/components/shared/SkillTagEditor";
+import { useActiveSection } from "@/hooks/useActiveSection";
 import { useUpdateMyTalentProfile } from "@/features/talent/talent.queries";
 import { useUpdateMyName } from "@/features/users/users.queries";
 import { useSkills } from "@/features/taxonomy/taxonomy.queries";
@@ -25,10 +26,9 @@ import {
   TIMEZONE_OPTIONS,
   bucketToYears,
   normalizeUrl,
-  profileFormSchema,
   yearsToBucket,
-  type ProfileFormValues,
-} from "@/features/talent/talent.schemas";
+} from "@/features/talent/talent.constants";
+import { profileFormSchema, type ProfileFormValues } from "@/features/talent/talent.schemas";
 import { ROUTES } from "@/constants/routes";
 import type { TalentProfile } from "@/types/talent";
 
@@ -38,7 +38,7 @@ interface ProfileFormProps {
 
 export const ProfileForm = ({ profile }: ProfileFormProps) => {
   const { toast } = useToast();
-  const [activeSection, setActiveSection] = useState("basics");
+  const [activeSection, setActiveSection] = useActiveSection(PROF_SECTIONS.map((s) => s.id));
   const [skills, setSkills] = useState<string[]>(profile?.skills.map((s) => s.skill.name) ?? []);
   const { data: allSkills } = useSkills();
   const updateProfileMutation = useUpdateMyTalentProfile();
@@ -93,24 +93,6 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
     setSkills(profile.skills.map((s) => s.skill.name));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile?.id]);
-
-  useEffect(() => {
-    const ids = PROF_SECTIONS.map((s) => s.id);
-    const obs = new IntersectionObserver(
-      (entries) => {
-        const hit = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
-        if (hit) setActiveSection(hit.target.id);
-      },
-      { rootMargin: "-25% 0px -60% 0px", threshold: 0 }
-    );
-    ids.forEach((id) => {
-      const el = document.getElementById(id);
-      if (el) obs.observe(el);
-    });
-    return () => obs.disconnect();
-  }, []);
 
   const scrollTo = (id: string) => {
     setActiveSection(id);
@@ -238,7 +220,11 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
                   </em>
                 }
               />
-              <SkillTagEditor setSkills={setSkills} skills={skills} />
+              <SkillTagEditor
+                setSkills={setSkills}
+                skills={skills}
+                suggestions={(allSkills ?? []).map((s) => s.name)}
+              />
             </section>
 
             <PreferencesSection
@@ -251,7 +237,7 @@ export const ProfileForm = ({ profile }: ProfileFormProps) => {
             <LinksSection
               onResumeUploaded={(url) => setValue("resumeUrl", url)}
               register={register}
-              resumeUrl={resumeUrl}
+              resumeUrl={resumeUrl ?? ""}
             />
 
             <VisibilitySection isOpenToWork={isOpenToWork} onToggle={(v) => setValue("isOpenToWork", v)} />

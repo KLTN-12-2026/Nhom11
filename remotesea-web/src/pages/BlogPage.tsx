@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ArrowUpRight, ArrowRight } from "lucide-react";
+import { PillToggle } from "@/components/shared/PillToggle";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const POSTS = [
@@ -205,17 +206,16 @@ export const BlogPage = () => {
             </div>
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map((c) => (
-                <button
-                  className={`rounded-full px-3.5 py-1.5 text-[13px] font-medium transition-all ${
-                    activeCat === c
-                      ? "bg-brand-600 text-white"
-                      : "border border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50"
-                  }`}
+                <PillToggle
+                  active={activeCat === c}
+                  activeClassName="bg-brand-600 text-white"
+                  className="px-3.5 py-1.5 text-[13px] font-medium transition-all"
+                  inactiveClassName="border border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50"
                   key={c}
                   onClick={() => setActiveCat(c)}
                 >
                   {c}
-                </button>
+                </PillToggle>
               ))}
             </div>
           </div>

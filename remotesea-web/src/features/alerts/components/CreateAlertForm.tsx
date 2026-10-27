@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/utils/cn";
+import { PillToggle } from "@/components/shared/PillToggle";
 import { useCategories } from "@/features/taxonomy/taxonomy.queries";
 import {
   createAlertFormSchema,
@@ -129,20 +129,16 @@ export const CreateAlertForm = ({ onCreate }: CreateAlertFormProps) => {
           {categories.map((category) => {
             const isSelected = categoryIds.includes(category.id);
             return (
-              <button
-                aria-pressed={isSelected}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-[12px] transition-colors",
-                  isSelected
-                    ? "border-brand-600 bg-brand-50 text-brand-700"
-                    : "border-neutral-200 text-neutral-600 hover:border-neutral-300"
-                )}
+              <PillToggle
+                active={isSelected}
+                activeClassName="border-brand-600 bg-brand-50 text-brand-700"
+                className="border px-3 py-1 text-[12px] transition-colors"
+                inactiveClassName="border-neutral-200 text-neutral-600 hover:border-neutral-300"
                 key={category.id}
-                type="button"
                 onClick={() => toggleCategory(category.id)}
               >
                 {category.name}
-              </button>
+              </PillToggle>
             );
           })}
         </div>

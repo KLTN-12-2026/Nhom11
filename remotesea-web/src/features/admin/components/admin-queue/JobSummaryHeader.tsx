@@ -1,6 +1,7 @@
-import { CompanyInitial } from "@/features/admin/components/CompanyInitial";
+import { CompanyLogo } from "@/components/ui/company-logo";
 import { VerifiedBadge } from "@/components/shared/VerifiedBadge";
 import {
+  colorFor,
   formatSalary,
   hoursSince,
   JOB_TYPE_LABELS,
@@ -32,7 +33,11 @@ export const JobSummaryHeader = ({ job }: JobSummaryHeaderProps) => {
   return (
     <div className="border-b border-neutral-100 p-5">
       <div className="flex items-start gap-4">
-        <CompanyInitial name={job.employer.companyName} size={46} />
+        <CompanyLogo
+          color={colorFor(job.employer.companyName)}
+          initial={job.employer.companyName.charAt(0).toUpperCase()}
+          size={46}
+        />
         <div className="flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
             <span className="text-[13px] text-neutral-500">Submitted by</span>

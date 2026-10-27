@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listSavedJobs, toggleSavedJob } from "@/features/saved/saved.api";
+import { listSavedJobs, saveJob, unsaveJob } from "@/features/saved/saved.api";
 import { useAuth } from "@/contexts/AuthContext";
 
 export const SAVED_JOBS_KEY = ["saved-jobs"];
@@ -16,10 +16,20 @@ export const useSavedJobs = () => {
   });
 };
 
-export const useToggleSavedJob = () => {
+export const useSaveJob = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: toggleSavedJob,
+    mutationFn: saveJob,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: SAVED_JOBS_KEY });
+    },
+  });
+};
+
+export const useUnsaveJob = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: unsaveJob,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: SAVED_JOBS_KEY });
     },

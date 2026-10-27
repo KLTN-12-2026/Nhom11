@@ -1,17 +1,16 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
-import { useSkills } from "@/features/taxonomy/taxonomy.queries";
 
 interface SkillTagEditorProps {
   skills: string[];
   setSkills: (skills: string[]) => void;
+  suggestions?: string[];
 }
 
 const MAX_SUGGESTIONS = 6;
 
-export const SkillTagEditor = ({ skills, setSkills }: SkillTagEditorProps) => {
+export const SkillTagEditor = ({ skills, setSkills, suggestions = [] }: SkillTagEditorProps) => {
   const [inputValue, setInputValue] = useState("");
-  const { data: allSkills } = useSkills();
 
   const addSkill = (skill: string) => {
     const trimmed = skill.trim();
@@ -32,9 +31,7 @@ export const SkillTagEditor = ({ skills, setSkills }: SkillTagEditorProps) => {
     }
   };
 
-  const suggestedSkills = (allSkills ?? [])
-    .map((skill) => skill.name)
-    .filter((name) => !skills.includes(name));
+  const suggestedSkills = suggestions.filter((name) => !skills.includes(name));
 
   return (
     <div className="space-y-3">
