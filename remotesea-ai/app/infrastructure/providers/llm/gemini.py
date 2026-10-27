@@ -28,6 +28,7 @@ class GeminiProvider(AiModelProvider):
             raise ValueError("GEMINI_API_KEY is required when AI_PROVIDER=GEMINI")
         self._model = settings.ai_model
         self._api_key = settings.gemini_api_key
+        self._temperature = settings.ai_temperature
         self._client = httpx.AsyncClient(base_url=_API_BASE, timeout=settings.ai_request_timeout_seconds)
 
     @property
@@ -37,7 +38,7 @@ class GeminiProvider(AiModelProvider):
     async def complete(
         self, system: str, prompt: str, json_schema: dict | None = None, model: str | None = None
     ) -> str:
-        payload = _build_payload(system, prompt, json_schema)
+        payload = _build_payload(system, prompt, json_schema, self._temperature)
 
         async def _call() -> dict:
             response = await self._client.post(
@@ -52,7 +53,7 @@ class GeminiProvider(AiModelProvider):
         return _extract_text(data)
 
     async def stream(self, system: str, prompt: str, model: str | None = None) -> AsyncIterator[str]:
-        payload = _build_payload(system, prompt, json_schema=None)
+        payload = _build_payload(system, prompt, json_schema=None, temperature=self._temperature)
         async with self._client.stream(
             "POST",
             f"/models/{model or self._model}:streamGenerateContent",
@@ -73,17 +74,22 @@ class GeminiProvider(AiModelProvider):
 
 
 # Pure — no I/O — so both are unit-testable without a live API key.
-def _build_payload(system: str, prompt: str, json_schema: dict | None) -> dict:
-    payload: dict = {
+def _build_payload(system: str, prompt: str, json_schema: dict | None, temperature: float) -> dict:
+    # Gemini defaults to 1.0 — low here for the same reason Ollama's and
+    # Anthropic's are: every call is a structured business decision, not
+    # creative text (see Settings.ai_temperature). generationConfig is
+    # always present now (not just when json_schema is given) so
+    # temperature applies to every call, including the non-structured
+    # stream() path.
+    generation_config: dict = {"temperature": temperature}
+    if json_schema is not None:
+        generation_config["responseMimeType"] = "application/json"
+        generation_config["responseSchema"] = json_schema
+    return {
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
         "systemInstruction": {"parts": [{"text": system}]},
+        "generationConfig": generation_config,
     }
-    if json_schema is not None:
-        payload["generationConfig"] = {
-            "responseMimeType": "application/json",
-            "responseSchema": json_schema,
-        }
-    return payload
 
 
 def _extract_text(data: dict) -> str:

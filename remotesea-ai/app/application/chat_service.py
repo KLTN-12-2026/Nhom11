@@ -1,3 +1,5 @@
+import asyncio
+import time
 import uuid
 from datetime import datetime, timezone
 
@@ -99,7 +101,17 @@ class ChatService:
             conversation = await self._get_owned_conversation(
                 request.conversation_id, context.user_id
             )
-            history = await self._recent_history(conversation.id)
+            # History (Postgres) and the question embedding (embedding
+            # provider HTTP call) are independent — run them concurrently
+            # rather than back-to-back, same "independent I/O -> gather"
+            # rule OrchestratorService/InferenceService already apply.
+            # Computed once, reused for both the similarity search below and
+            # as the value stored on the new turn — avoids embedding the
+            # same question text twice.
+            history, question_embedding = await asyncio.gather(
+                self._recent_history(conversation.id),
+                self._embed_question(request.question),
+            )
         else:
             conversation = AiConversation(
                 id=str(uuid.uuid4()),
@@ -109,19 +121,29 @@ class ChatService:
             self._db.add(conversation)
             await self._db.flush()  # same FK-ordering reason as RagIngestionService
             history = []
+            question_embedding = await self._embed_question(request.question)
 
-        # Computed once, reused for both the similarity search below and as
-        # the value stored on the new turn — avoids embedding the same
-        # question text twice.
-        question_embedding = await self._embed_question(request.question)
         related_turns = (
             await self._find_related_turns(context.user_id, question_embedding, conversation.id)
             if question_embedding is not None
             else []
         )
 
+        started_at = time.monotonic()
         result = await self._orchestrator.generate(
             context, bearer_token, request.question, request.application_id, history, related_turns
+        )
+        # orchestrator_service.generate() already logs its own detailed
+        # breakdown (tools/RAG/retry) — this line adds the piece only
+        # ChatService knows: total time including history/related-turn
+        # lookups, and which conversation it belongs to, for chat-specific
+        # latency tracking that /v1/inference already gets via latency_ms.
+        logger.info(
+            "chat_send_message conversation_id=%s elapsed_ms=%d history_turns=%d related_turns=%d",
+            conversation.id,
+            int((time.monotonic() - started_at) * 1000),
+            len(history),
+            len(related_turns),
         )
 
         # Explicit, shared timestamp — AiConversationTurn.created_at's

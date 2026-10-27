@@ -19,6 +19,7 @@ class OllamaProvider(AiModelProvider):
         self._base_url = settings.ollama_base_url
         self._model = settings.ai_model
         self._keep_alive = settings.ollama_keep_alive
+        self._temperature = settings.ai_temperature
         # CPU-only local inference (see README: no GPU in dev) is slow —
         # ai_request_timeout_seconds is generous so a real answer doesn't
         # get cut off mid-generation on a small machine, matching
@@ -52,6 +53,10 @@ class OllamaProvider(AiModelProvider):
             # cost on top of generation time (observed live: a cold call's
             # load_duration alone was ~15.8s).
             "keep_alive": self._keep_alive,
+            # Ollama defaults to 0.8 (fairly high randomness) — explicit
+            # and low here since every call is a structured business
+            # decision, not creative text (see Settings.ai_temperature).
+            "options": {"temperature": self._temperature},
         }
 
     async def complete(

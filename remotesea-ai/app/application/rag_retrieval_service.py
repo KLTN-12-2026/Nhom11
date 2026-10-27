@@ -1,3 +1,4 @@
+import asyncio
 import time
 
 from sqlalchemy import func, select
@@ -75,9 +76,15 @@ class RagRetrievalService:
     # from an indexed generated column — correct at the current knowledge
     # base's scale, a real but separate follow-up once it grows much larger.
     async def retrieve(self, query: str, top_k: int = 5) -> list[RetrievedChunk]:
+        started_at = time.monotonic()
         cache_key = (query.strip().lower(), top_k)
         cached = _cache_get(cache_key)
         if cached is not None:
+            logger.info(
+                "rag_retrieve cache=hit elapsed_ms=%d chunks=%d",
+                int((time.monotonic() - started_at) * 1000),
+                len(cached),
+            )
             return cached
 
         # Qdrant is a real external network dependency now (previously this
@@ -90,18 +97,15 @@ class RagRetrievalService:
             [query_embedding] = await self._embedding_provider.embed([query])
             over_fetch = top_k * _OVER_FETCH_FACTOR
 
-            vector_results = await self._search_vector(query_embedding, over_fetch)
-
-            tsquery = func.plainto_tsquery("english", query)
-            tsvector = func.to_tsvector("english", RagChunk.content)
-            fts_stmt = (
-                select(RagChunk, RagDocument.title, RagDocument.source)
-                .join(RagDocument, RagChunk.document_id == RagDocument.id)
-                .where(tsvector.op("@@")(tsquery))
-                .order_by(func.ts_rank(tsvector, tsquery).desc())
-                .limit(over_fetch)
+            # Qdrant (vector) and Postgres (full-text) are independent
+            # external round trips — run them concurrently rather than
+            # back-to-back, same "independent I/O -> gather" rule already
+            # applied to Tool calls/RAG in OrchestratorService and to the
+            # two DB lookups in InferenceService.run().
+            vector_results, fts_rows = await asyncio.gather(
+                self._search_vector(query_embedding, over_fetch),
+                self._search_fts(query, over_fetch),
             )
-            fts_rows = (await self._db.execute(fts_stmt)).all()
             fts_results = await self._to_retrieved_chunks_with_distance(fts_rows, query_embedding)
         except Exception as exc:  # noqa: BLE001 - converted to a clean 502 below
             message = error_message(exc)
@@ -110,7 +114,26 @@ class RagRetrievalService:
 
         result = reciprocal_rank_fusion(vector_results, fts_results, top_k=top_k)
         _cache_set(cache_key, result)
+        logger.info(
+            "rag_retrieve cache=miss elapsed_ms=%d vector_candidates=%d fts_candidates=%d chunks=%d",
+            int((time.monotonic() - started_at) * 1000),
+            len(vector_results),
+            len(fts_results),
+            len(result),
+        )
         return result
+
+    async def _search_fts(self, query: str, limit: int) -> list:
+        tsquery = func.plainto_tsquery("english", query)
+        tsvector = func.to_tsvector("english", RagChunk.content)
+        fts_stmt = (
+            select(RagChunk, RagDocument.title, RagDocument.source)
+            .join(RagDocument, RagChunk.document_id == RagDocument.id)
+            .where(tsvector.op("@@")(tsquery))
+            .order_by(func.ts_rank(tsvector, tsquery).desc())
+            .limit(limit)
+        )
+        return (await self._db.execute(fts_stmt)).all()
 
     # Qdrant's `score` for a Cosine-distance collection is a similarity
     # (higher = better match) — the opposite convention from this

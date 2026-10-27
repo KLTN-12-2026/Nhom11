@@ -29,26 +29,29 @@ class TestCompleteStructured:
     @pytest.mark.asyncio
     async def test_succeeds_on_first_attempt(self):
         provider = _SequencedProvider(['{"text": "hi", "score": 90}'])
-        raw, parsed = await complete_structured(provider, _Answer, "system", "prompt")
+        raw, parsed, attempts = await complete_structured(provider, _Answer, "system", "prompt")
         assert parsed is not None
         assert parsed.text == "hi"
         assert provider.call_count == 1
+        assert attempts == 1
 
     @pytest.mark.asyncio
     async def test_retries_once_after_unparseable_first_attempt(self):
         provider = _SequencedProvider(["not json at all", '{"text": "recovered", "score": 50}'])
-        raw, parsed = await complete_structured(provider, _Answer, "system", "prompt")
+        raw, parsed, attempts = await complete_structured(provider, _Answer, "system", "prompt")
         assert parsed is not None
         assert parsed.text == "recovered"
         assert provider.call_count == 2
+        assert attempts == 2
 
     @pytest.mark.asyncio
     async def test_returns_none_when_both_attempts_fail(self):
         provider = _SequencedProvider(["still not json", "also not json"])
-        raw, parsed = await complete_structured(provider, _Answer, "system", "prompt")
+        raw, parsed, attempts = await complete_structured(provider, _Answer, "system", "prompt")
         assert parsed is None
         assert raw == "also not json"
         assert provider.call_count == 2
+        assert attempts == 2
 
     @pytest.mark.asyncio
     async def test_passes_model_override_through(self):

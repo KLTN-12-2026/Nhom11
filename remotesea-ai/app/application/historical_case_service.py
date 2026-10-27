@@ -1,7 +1,11 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.domain.candidate_analysis.historical_case import HistoricalCase, build_historical_case
+from app.domain.candidate_analysis.historical_case import (
+    HistoricalCase,
+    build_historical_case,
+    strip_seniority_level,
+)
 from app.infrastructure.models.ai_feedback import AiFeedback
 from app.infrastructure.models.ai_interaction import AiInteraction, AiInteractionStatus, AiTask
 
@@ -19,11 +23,13 @@ def _escape_like(value: str) -> str:
 
 
 # "Case Retrieval" per the architecture doc's Historical Cases concept — but
-# deliberately not semantic search: matching on job title text only. Real
-# similarity search would need embeddings on AiInteraction too, which
-# doesn't exist yet; this is a disclosed simplification, same spirit as
-# OrchestratorService's rule-based routing rather than an LLM intent
-# classifier.
+# deliberately not semantic search: matching on job title text (with
+# seniority words stripped first, so "Senior Backend Engineer" and "Staff
+# Backend Engineer" match each other — see strip_seniority_level), not
+# embeddings. Real embedding-based similarity would need vectors on
+# AiInteraction too, which doesn't exist yet; this is a disclosed
+# simplification, same spirit as OrchestratorService's rule-based routing
+# rather than an LLM intent classifier.
 #
 # Never includes candidate name/skills/resume text — only the anonymized
 # outcome (score/recommendation/reasoning, plus the human correction if
@@ -37,6 +43,11 @@ class HistoricalCaseService:
         self._db = db
 
     async def find_similar(self, job_title: str, limit: int = 3) -> list[HistoricalCase]:
+        # Stripped, not the raw title — "Staff Backend Engineer" would
+        # otherwise never match a stored "Senior Backend Engineer" (neither
+        # is a substring of the other), even though they're clearly the
+        # same underlying role for grounding purposes.
+        search_term = strip_seniority_level(job_title)
         stmt = (
             select(AiInteraction, AiFeedback)
             .join(AiFeedback, AiFeedback.interaction_id == AiInteraction.id)
@@ -50,7 +61,7 @@ class HistoricalCaseService:
                 # _escape_like() above.
                 AiInteraction.input["job"]["title"]
                 .as_string()
-                .ilike(f"%{_escape_like(job_title)}%", escape="\\"),
+                .ilike(f"%{_escape_like(search_term)}%", escape="\\"),
             )
             .order_by(AiFeedback.created_at.desc())
             .limit(limit * _OVER_FETCH_FACTOR)

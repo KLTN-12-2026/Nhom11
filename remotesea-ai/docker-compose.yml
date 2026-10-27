@@ -32,18 +32,19 @@ services:
     env_file: .env
     environment:
       # Inside Docker's network, "localhost" means the container itself —
-      # override the .env file's host-facing DATABASE_URL/RAG_DATABASE_URL
-      # to the compose service name instead. RAG_DATABASE_URL was missed
-      # when RAG was added (code-review finding) — without this override the
-      # container would still resolve it to .env's localhost:5434, breaking
-      # every RAG-touching call in this containerized deploy path even
-      # though local (non-docker) dev works fine and masks the bug.
-      # OLLAMA_BASE_URL stays host.docker.internal:11434 (see .env.example)
-      # since Ollama runs natively on the host, not as a container here —
-      # its Docker image bundles CUDA libraries for GPU inference this
-      # machine can't use, and was 10GB+ of dead weight on a disk-constrained
-      # dev box for zero benefit over the native binary.
-      DATABASE_URL: postgresql+asyncpg://ai_service:ai_service@postgres:5432/remotesea_ai
+      # override the .env file's host-facing RAG_DATABASE_URL to the
+      # compose service name instead (RAG's database is still local Docker
+      # Postgres). DATABASE_URL is deliberately NOT overridden here anymore
+      # — the main database moved to Supabase (a real external host,
+      # reachable identically from inside or outside the container, no
+      # "localhost means the container" translation needed), so .env's own
+      # value is already correct as-is. Overriding it back to the local
+      # `postgres` service, like this used to, would silently point the
+      # containerized deploy at the wrong database entirely — found live
+      # when a stale image (built before the Supabase switch, with .env
+      # baked in — see .dockerignore) produced a confusing
+      # DuplicatePreparedStatementError that had nothing to do with the
+      # actual current bug.
       RAG_DATABASE_URL: postgresql+asyncpg://ai_service:ai_service@postgres:5432/remotesea_rag
     ports:
       - "8000:8000"
