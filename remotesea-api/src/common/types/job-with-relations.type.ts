@@ -1,4 +1,4 @@
-import type { Job, EmployerProfile, Skill, Category } from "@prisma/client";
+import type { Job, EmployerProfile, Skill, Category, Prisma } from "@prisma/client";
 
 export type JobWithRelations = Job & {
   employer: Pick<EmployerProfile, "companyName" | "logoUrl" | "slug">;
@@ -6,14 +6,8 @@ export type JobWithRelations = Job & {
   categories: Array<{ category: Category }>;
 };
 
-export type ApplicationWithJob = { job: JobWithRelations } & Record<string, unknown>;
-
-export type PaginatedResponse<T> = {
-  data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    pages: number;
-  };
-};
+export const jobWithRelationsInclude = {
+  employer: { select: { companyName: true, logoUrl: true, slug: true } },
+  categories: { include: { category: true } },
+  skills: { include: { skill: true } },
+} satisfies Prisma.JobInclude;

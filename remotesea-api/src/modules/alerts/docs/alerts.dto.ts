@@ -1,4 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  JOB_TYPE_VALUES,
+  EXPERIENCE_LEVEL_VALUES,
+  ALERT_FREQUENCY_VALUES,
+} from "@/common/constants/enum-values.constants";
 
 /**
  * Swagger-only request/response shapes for the Alerts module.
@@ -15,10 +20,10 @@ export class CreateAlertRequestDto {
   @ApiPropertyOptional({ maxLength: 200, example: "react typescript" })
   keywords?: string;
 
-  @ApiPropertyOptional({ enum: ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"], example: "FULL_TIME" })
+  @ApiPropertyOptional({ enum: JOB_TYPE_VALUES, example: "FULL_TIME" })
   jobType?: "FULL_TIME" | "PART_TIME" | "CONTRACT" | "FREELANCE";
 
-  @ApiPropertyOptional({ enum: ["ENTRY", "MID", "SENIOR", "LEAD", "EXECUTIVE"], example: "SENIOR" })
+  @ApiPropertyOptional({ enum: EXPERIENCE_LEVEL_VALUES, example: "SENIOR" })
   level?: "ENTRY" | "MID" | "SENIOR" | "LEAD" | "EXECUTIVE";
 
   @ApiPropertyOptional({ type: Number, minimum: 1, example: 80000, description: "Matches jobs with salaryMin >= value" })
@@ -30,7 +35,7 @@ export class CreateAlertRequestDto {
   @ApiPropertyOptional({ example: "America/New_York", description: "Stored only, not used in matching" })
   timezone?: string;
 
-  @ApiPropertyOptional({ enum: ["IMMEDIATE", "DAILY", "WEEKLY"], default: "DAILY", example: "DAILY" })
+  @ApiPropertyOptional({ enum: ALERT_FREQUENCY_VALUES, default: "DAILY", example: "DAILY" })
   frequency?: "IMMEDIATE" | "DAILY" | "WEEKLY";
 
   @ApiPropertyOptional({ type: [String], example: ["cme8f1a2b0000ug0h9x1n1a2"] })
@@ -71,10 +76,10 @@ export class AlertResponseDto {
   @ApiPropertyOptional({ nullable: true, example: "react typescript" })
   keywords!: string | null;
 
-  @ApiPropertyOptional({ enum: ["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"], nullable: true, example: "FULL_TIME" })
+  @ApiPropertyOptional({ enum: JOB_TYPE_VALUES, nullable: true, example: "FULL_TIME" })
   jobType!: string | null;
 
-  @ApiPropertyOptional({ enum: ["ENTRY", "MID", "SENIOR", "LEAD", "EXECUTIVE"], nullable: true, example: "SENIOR" })
+  @ApiPropertyOptional({ enum: EXPERIENCE_LEVEL_VALUES, nullable: true, example: "SENIOR" })
   level!: string | null;
 
   @ApiPropertyOptional({ nullable: true, example: 80000 })
@@ -86,7 +91,7 @@ export class AlertResponseDto {
   @ApiPropertyOptional({ nullable: true, example: "America/New_York" })
   timezone!: string | null;
 
-  @ApiProperty({ enum: ["IMMEDIATE", "DAILY", "WEEKLY"], example: "DAILY" })
+  @ApiProperty({ enum: ALERT_FREQUENCY_VALUES, example: "DAILY" })
   frequency!: "IMMEDIATE" | "DAILY" | "WEEKLY";
 
   @ApiProperty({ example: true })

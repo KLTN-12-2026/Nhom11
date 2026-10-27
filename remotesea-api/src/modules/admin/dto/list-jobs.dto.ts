@@ -1,9 +1,9 @@
-import { z } from "zod";
+import type { z } from "zod";
+import { paginationQuerySchema } from "@/common/dto/pagination-query.schema";
+import { jobStatusSchema } from "@/common/dto/enums.schema";
 
-export const listJobsSchema = z.object({
-  status: z.enum(["DRAFT", "PENDING_REVIEW", "ACTIVE", "CLOSED", "REJECTED"]).default("PENDING_REVIEW"),
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(50).default(20),
+export const listJobsSchema = paginationQuerySchema.extend({
+  status: jobStatusSchema.default("PENDING_REVIEW"),
 });
 
 export type ListJobsDto = z.infer<typeof listJobsSchema>;

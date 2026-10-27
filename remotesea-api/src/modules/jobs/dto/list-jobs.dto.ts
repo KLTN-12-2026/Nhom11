@@ -1,7 +1,7 @@
 import { z } from "zod";
+import { paginationQuerySchema } from "@/common/dto/pagination-query.schema";
+import { jobTypeSchema, experienceLevelSchema } from "@/common/dto/enums.schema";
 
-const jobTypeEnum = z.enum(["FULL_TIME", "PART_TIME", "CONTRACT", "FREELANCE"]);
-const levelEnum = z.enum(["ENTRY", "MID", "SENIOR", "LEAD", "EXECUTIVE"]);
 const timezoneKeyEnum = z.enum(["sea", "async", "SG", "AU", "US"]);
 
 // Accepts a single value (`?type=FULL_TIME`, the original single-select contract)
@@ -11,18 +11,16 @@ const timezoneKeyEnum = z.enum(["sea", "async", "SG", "AU", "US"]);
 const toArray = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess((v) => (v === undefined ? undefined : Array.isArray(v) ? v : [v]), z.array(schema)).optional();
 
-export const listJobsSchema = z.object({
+export const listJobsSchema = paginationQuerySchema.extend({
   q: z.string().optional(),
-  type: toArray(jobTypeEnum),
-  level: toArray(levelEnum),
+  type: toArray(jobTypeSchema),
+  level: toArray(experienceLevelSchema),
   country: z.string().optional(),
   category: toArray(z.string()),
   timezone: toArray(timezoneKeyEnum),
   salaryMin: z.coerce.number().int().positive().optional(),
   salaryMax: z.coerce.number().int().positive().optional(),
   sort: z.enum(["recent", "salary", "featured"]).optional(),
-  page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(50).default(20),
 });
 
 export type ListJobsDto = z.infer<typeof listJobsSchema>;
