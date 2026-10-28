@@ -25,7 +25,7 @@ class GeminiProvider(AiModelProvider):
     def __init__(self) -> None:
         settings = get_settings()
         if not settings.gemini_api_key:
-            raise ValueError("GEMINI_API_KEY is required when AI_PROVIDER=GEMINI")
+            raise ValueError("GEMINI_API_KEY is required when AI_MODEL_PROVIDER=GEMINI")
         self._model = settings.ai_model
         self._api_key = settings.gemini_api_key
         self._temperature = settings.ai_temperature

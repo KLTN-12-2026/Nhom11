@@ -28,7 +28,7 @@ class AnthropicProvider(AiModelProvider):
     def __init__(self) -> None:
         settings = get_settings()
         if not settings.anthropic_api_key:
-            raise ValueError("ANTHROPIC_API_KEY is required when AI_PROVIDER=ANTHROPIC")
+            raise ValueError("ANTHROPIC_API_KEY is required when AI_MODEL_PROVIDER=ANTHROPIC")
         self._model = settings.ai_model
         self._temperature = settings.ai_temperature
         self._client = httpx.AsyncClient(

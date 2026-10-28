@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,14 +17,32 @@ class Settings(BaseSettings):
     ai_service_secret: str
     # AiModelProvider selection — see infrastructure/providers/llm/factory.py.
     # OLLAMA is the default: self-hosted, zero API key, zero-config beyond
-    # what's already here. ANTHROPIC/GEMINI are opt-in alternatives, each
-    # requiring their own api key below.
-    ai_provider: Literal["OLLAMA", "ANTHROPIC", "GEMINI", "MOCK"] = "OLLAMA"
-    # Meaning depends on ai_provider: an Ollama tag, an Anthropic model id,
-    # or a Gemini model id. Defaults to today's Ollama default so switching
-    # provider is the only thing that changes for existing Ollama-only
-    # setups; picking ANTHROPIC/GEMINI requires setting this to a model that
-    # provider actually serves — not silently guessed per-provider.
+    # what's already here. ANTHROPIC/GEMINI/CLOUDFLARE are opt-in
+    # alternatives, each requiring their own credentials below.
+    # AI_MODEL_PROVIDER is the current env var name; AI_PROVIDER (its old
+    # name) is still accepted as a fallback so an environment (e.g. Render)
+    # that hasn't been migrated to the new name yet doesn't silently fall
+    # back to the OLLAMA default. AI_MODEL_PROVIDER wins when both are set.
+    ai_model_provider: Literal["OLLAMA", "ANTHROPIC", "GEMINI", "CLOUDFLARE", "MOCK"] = Field(
+        default="OLLAMA",
+        validation_alias=AliasChoices("AI_MODEL_PROVIDER", "AI_PROVIDER"),
+    )
+
+    @field_validator("ai_model_provider", mode="before")
+    @classmethod
+    def _normalize_provider(cls, value: object) -> object:
+        # Accepts any case ("cloudflare", "Cloudflare", "CLOUDFLARE") rather
+        # than failing validation over a casing mismatch in whatever set the
+        # env var.
+        return value.upper() if isinstance(value, str) else value
+
+    # Meaning depends on ai_model_provider: an Ollama tag, an Anthropic
+    # model id, a Gemini model id, or a Cloudflare Workers AI model id.
+    # Shared fallback for every provider that doesn't have its own
+    # <VENDOR>_MODEL var below (currently ANTHROPIC/GEMINI/MOCK) — kept so
+    # switching between those is still just two env vars. OLLAMA/CLOUDFLARE
+    # each read their own var first (ollama_model/cloudflare_model) and only
+    # fall back to this when that's unset.
     ai_model: str = "qwen2.5:3b-instruct"
     # Optional override for the tool-selection/RAG-necessity classification
     # call specifically (OrchestratorService._select_tools) — that's a much
@@ -48,7 +67,23 @@ class Settings(BaseSettings):
     ai_temperature: float = 0.2
     anthropic_api_key: str | None = None
     gemini_api_key: str | None = None
+    # Workers AI: account-scoped, not a single global key — both required
+    # together when ai_model_provider=CLOUDFLARE (see
+    # providers/llm/cloudflare.py).
+    cloudflare_account_id: str | None = None
+    cloudflare_api_token: str | None = None
+    # Cloudflare Workers AI model id (e.g. "@cf/meta/llama-3.1-8b-instruct").
+    # None (default) means "use ai_model" — see resolved_cloudflare_model.
+    cloudflare_model: str | None = None
+    # Not required in production when ai_model_provider=CLOUDFLARE (or any
+    # non-OLLAMA provider) — only OllamaProvider ever reads this. The
+    # default points at a local Ollama daemon so an unset var never sends a
+    # request anywhere unexpected; it's simply never consulted outside the
+    # OLLAMA path.
     ollama_base_url: str = "http://localhost:11434"
+    # Ollama tag (e.g. "qwen2.5:3b-instruct"). None (default) means "use
+    # ai_model" — see resolved_ollama_model.
+    ollama_model: str | None = None
     # How long Ollama keeps the model loaded in memory after a request —
     # Ollama's own default is short enough that spaced-out requests can
     # trigger a multi-second reload on the next call (observed live:
@@ -76,11 +111,26 @@ class Settings(BaseSettings):
     # for RAG's own sake (the main DB still needs it, for
     # ai_conversation_turns.embedding — an unrelated feature).
     rag_database_url: str
-    embedding_provider: Literal["OLLAMA", "MOCK"] = "OLLAMA"
+    # OLLAMA (default) needs a real, reachable Ollama daemon — fine for local
+    # dev (docker-compose) but nothing runs one in production unless deployed
+    # separately. CLOUDFLARE is the option for a deployment with no
+    # self-hosted Ollama at all (see CloudflareEmbeddingProvider) — same
+    # account/token as ai_model_provider=CLOUDFLARE, but this is an
+    # independent setting: embedding and text-generation providers don't
+    # have to match.
+    embedding_provider: Literal["OLLAMA", "CLOUDFLARE", "MOCK"] = "OLLAMA"
     ollama_embedding_model: str = "nomic-embed-text"
-    # nomic-embed-text's output dimension — Qdrant's collection vector size
-    # is fixed at collection-creation time, so this has to be a known
-    # constant, not something read off a live embedding response.
+    # Workers AI BGE embedding model id, used only when
+    # embedding_provider=CLOUDFLARE. bge-base-en-v1.5's dimension (768)
+    # matches this service's default embedding_dimensions below, so the
+    # existing Qdrant collection needs no resizing to switch to it.
+    cloudflare_embedding_model: str = "@cf/baai/bge-base-en-v1.5"
+    # nomic-embed-text's (and bge-base-en-v1.5's) output dimension —
+    # Qdrant's collection vector size is fixed at collection-creation time,
+    # so this has to be a known constant, not something read off a live
+    # embedding response. Switching to an embedding model with a different
+    # dimension requires recreating the Qdrant collection, not just changing
+    # this value.
     embedding_dimensions: int = 768
     # RAG chunk vector storage/search — see infrastructure/qdrant_client.py.
     # Qdrant Cloud (a managed cluster), not self-hosted, so this is just a
@@ -88,6 +138,18 @@ class Settings(BaseSettings):
     qdrant_url: str
     qdrant_api_key: str | None = None
     qdrant_collection_name: str = "remotesea_rag_chunks"
+
+    # The model id CloudflareProvider actually uses — CLOUDFLARE_MODEL when
+    # set, otherwise AI_MODEL. Kept as a method on Settings (not duplicated
+    # per-provider) so the fallback rule lives in exactly one place.
+    @property
+    def resolved_cloudflare_model(self) -> str:
+        return self.cloudflare_model or self.ai_model
+
+    # Same fallback rule as resolved_cloudflare_model, for OLLAMA_MODEL.
+    @property
+    def resolved_ollama_model(self) -> str:
+        return self.ollama_model or self.ai_model
 
 
 # lru_cache, not a module-level instance — same reasoning as NestJS's
