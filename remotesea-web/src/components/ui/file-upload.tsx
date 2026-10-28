@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { Check, Upload } from "lucide-react";
-import { uploadViaPresign, type UploadType } from "@/services/uploads.api";
+import { uploadViaPresign, validateFile, type UploadType } from "@/services/uploads.api";
 
 type UploadState = "idle" | "uploading" | "done" | "error";
 
@@ -28,6 +28,14 @@ export const FileUpload = ({ type, accept, label, value, onUploaded }: FileUploa
   const handleChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const validationError = validateFile(file, type);
+    if (validationError) {
+      setState("error");
+      setError(validationError);
+      event.target.value = "";
+      return;
+    }
 
     setState("uploading");
     setError(null);

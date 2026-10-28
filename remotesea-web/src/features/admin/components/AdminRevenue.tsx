@@ -1,5 +1,6 @@
 import { CreditCard, RefreshCw, TrendingUp, Wallet } from "lucide-react";
 import { EmptyRow } from "@/components/shared/EmptyRow";
+import { AdminRevenueSkeleton } from "@/features/admin/components/AdminRevenueSkeleton";
 import { useAdminRevenue } from "@/features/admin/admin.queries";
 import type { RevenueMonthBucket } from "@/types/admin";
 
@@ -21,7 +22,7 @@ const monthTotal = (month: RevenueMonthBucket): number => month.standard + month
 export const AdminRevenue = () => {
   const { data, isLoading } = useAdminRevenue();
 
-  if (isLoading) return <p className="text-sm text-neutral-400">Loading revenue…</p>;
+  if (isLoading) return <AdminRevenueSkeleton />;
   if (!data) return null;
 
   const { months, mix, transactions, totals } = data;

@@ -26,10 +26,14 @@ export const ReviewerChecklist = ({ checkedIndices, onToggle, disabled }: Review
         {REVIEW_CHECKLIST.map((c, i) => {
           const done = checkedIndices.has(i);
           return (
-            <div
-              className={`rounded-10 flex cursor-pointer items-start gap-3 border p-3 transition-all ${done ? "border-brand-200 bg-brand-50" : "border-neutral-100 bg-white hover:border-neutral-200"}`}
+            <button
+              aria-checked={done}
+              className={`rounded-10 flex w-full items-start gap-3 border p-3 text-left transition-all disabled:cursor-not-allowed ${done ? "border-brand-200 bg-brand-50" : "border-neutral-100 bg-white hover:border-neutral-200"}`}
+              disabled={disabled}
               key={c.label}
-              onClick={() => !disabled && onToggle(i)}
+              role="checkbox"
+              type="button"
+              onClick={() => onToggle(i)}
             >
               <span
                 className={`mt-0.5 grid h-5 w-5 flex-shrink-0 place-items-center rounded-full border-2 ${done ? "border-brand-600 bg-brand-600 text-white" : "border-neutral-200 text-transparent"}`}
@@ -42,7 +46,7 @@ export const ReviewerChecklist = ({ checkedIndices, onToggle, disabled }: Review
                 </div>
                 <div className="mt-0.5 text-[12px] text-neutral-400">{c.hint}</div>
               </div>
-            </div>
+            </button>
           );
         })}
       </div>

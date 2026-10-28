@@ -1,11 +1,9 @@
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToastMutation } from "@/hooks/useToastMutation";
+import { accountNameFormSchema, type AccountNameFormValues } from "@/features/settings/settings.schemas";
 import { useUpdateMyName } from "@/features/users/users.queries";
-
-interface AccountNameFormValues {
-  name: string;
-}
 
 export const AccountNameForm = () => {
   const { user } = useAuth();
@@ -15,18 +13,18 @@ export const AccountNameForm = () => {
   const {
     register,
     handleSubmit,
-    formState: { isSubmitting, isDirty },
-  } = useForm<AccountNameFormValues>({ defaultValues: { name: user?.name ?? "" } });
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<AccountNameFormValues>({
+    resolver: zodResolver(accountNameFormSchema),
+    defaultValues: { name: user?.name ?? "" },
+  });
 
-  const onSubmit = (values: AccountNameFormValues) => {
-    const trimmedName = values.name.trim();
-    if (!trimmedName) return;
-    return runWithToast(() => updateNameMutation.mutateAsync(trimmedName), {
+  const onSubmit = (values: AccountNameFormValues) =>
+    runWithToast(() => updateNameMutation.mutateAsync(values.name), {
       success: "Name updated",
       error: "Couldn't update name",
       errorDescription: "Please try again.",
     });
-  };
 
   return (
     <form className="grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit(onSubmit)}>
@@ -47,6 +45,7 @@ export const AccountNameForm = () => {
             </button>
           )}
         </div>
+        {errors.name && <p className="text-[11.5px] text-red-600">{errors.name.message}</p>}
       </div>
       <div className="space-y-1.5">
         <label className="block text-[12.5px] font-medium text-neutral-700">

@@ -27,6 +27,7 @@ export default defineConfig({
           ) {
             return "vendor-forms";
           }
+          if (id.includes("node_modules/@sentry")) return "vendor-sentry";
           return undefined;
         },
       },

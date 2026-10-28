@@ -4,6 +4,7 @@ import { RootLayout } from "@/layouts/RootLayout";
 import { GuestOnlyRoute } from "@/router/GuestOnlyRoute";
 import { ProtectedRoute } from "@/router/ProtectedRoute";
 import { FullPageLoader } from "@/components/ui/spinner";
+import { useAnalyticsPageview } from "@/hooks/useAnalyticsPageview";
 
 const HomePage = lazy(() => import("@/pages/HomePage").then((m) => ({ default: m.HomePage })));
 const NotFoundPage = lazy(() =>
@@ -84,6 +85,8 @@ const AdminPage = lazy(() =>
 );
 
 export const AppRouter = () => {
+  useAnalyticsPageview();
+
   return (
     <Suspense fallback={<FullPageLoader />}>
       <Routes>

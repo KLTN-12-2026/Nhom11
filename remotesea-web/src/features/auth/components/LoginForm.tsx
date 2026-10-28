@@ -9,12 +9,14 @@ import { TextField } from "@/components/shared/TextField";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/components/ui/toast";
 import { applyFormSubmitError } from "@/utils/form-errors";
+import { isSafeInternalPath } from "@/utils/safe-redirect";
 import { ROUTES } from "@/constants/routes";
 
 export const LoginForm = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? ROUTES.jobs;
+  const rawCallbackUrl = searchParams.get("callbackUrl");
+  const callbackUrl = rawCallbackUrl && isSafeInternalPath(rawCallbackUrl) ? rawCallbackUrl : ROUTES.jobs;
   const { login } = useAuth();
   const { toast } = useToast();
   const [formError, setFormError] = useState<string | null>(null);

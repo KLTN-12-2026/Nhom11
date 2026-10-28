@@ -97,9 +97,10 @@ export const JobsBoard = ({ filters: query, onFiltersChange }: JobsBoardProps) =
 
   return (
     <div className="mx-auto max-w-[1240px] px-6 py-8">
+      <h1 className="sr-only">Jobs</h1>
       <SearchBar value={search} onChange={setSearch} />
 
-      <div className="flex gap-8">
+      <div className="flex flex-col gap-8 sm:flex-row">
         <FilterSidebar facets={facets} filters={filters} onChange={setFilters} />
 
         <div className="min-w-0 flex-1">

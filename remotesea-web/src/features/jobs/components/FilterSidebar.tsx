@@ -98,7 +98,7 @@ export const FilterSidebar = ({ filters, onChange, facets }: FilterSidebarProps)
   const slugForCategoryName = (name: string) => categories?.find((c) => c.name === name)?.slug;
 
   return (
-    <aside className="w-[220px] flex-shrink-0">
+    <aside className="w-full flex-shrink-0 sm:w-[220px]">
       <div className="mb-1 flex items-center justify-between py-2">
         <h3 className="flex items-center gap-2 text-[15px] font-semibold text-neutral-900">
           Filters

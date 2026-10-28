@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as authApi from "@/features/auth/auth.api";
 import { registerUnauthorizedHandler } from "@/services/api-client";
 import { clearAccessToken, getAccessToken, setAccessToken } from "@/services/token-storage";
@@ -29,6 +30,10 @@ interface AuthProviderProps {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// The session is auth's own cache, not a regular feature query — kept here rather than
+// in a `.queries.ts` file since AuthContext is the single place that owns writes to it.
+const SESSION_KEY = ["session"];
+
 const hydrateFromSession = async (): Promise<AuthUser | null> => {
   try {
     return await authApi.getSession();
@@ -38,34 +43,44 @@ const hydrateFromSession = async (): Promise<AuthUser | null> => {
 };
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [status, setStatus] = useState<AuthStatus>(() =>
-    getAccessToken() ? "loading" : "unauthenticated"
-  );
+  const queryClient = useQueryClient();
+  const [hasToken, setHasToken] = useState(() => !!getAccessToken());
 
-  useEffect(() => {
-    if (!getAccessToken()) return;
-    hydrateFromSession().then((sessionUser) => {
-      setUser(sessionUser);
-      setStatus(sessionUser ? "authenticated" : "unauthenticated");
-    });
-  }, []);
+  const sessionQuery = useQuery({
+    queryKey: SESSION_KEY,
+    queryFn: hydrateFromSession,
+    enabled: hasToken,
+    staleTime: Infinity,
+    retry: false,
+  });
+
+  const user = sessionQuery.data ?? null;
+  const status: AuthStatus = !hasToken
+    ? "unauthenticated"
+    : sessionQuery.isLoading
+      ? "loading"
+      : user
+        ? "authenticated"
+        : "unauthenticated";
 
   useEffect(() => {
     registerUnauthorizedHandler(() => {
-      setUser(null);
-      setStatus("unauthenticated");
+      queryClient.setQueryData(SESSION_KEY, null);
+      setHasToken(false);
     });
-  }, []);
+  }, [queryClient]);
 
-  const loginWithToken = useCallback(async (token: string, remember = true) => {
-    setAccessToken(token, remember);
-    const sessionUser = await hydrateFromSession();
-    setUser(sessionUser);
-    setStatus(sessionUser ? "authenticated" : "unauthenticated");
-    if (!sessionUser) throw new Error("Could not load session after authentication");
-    return sessionUser;
-  }, []);
+  const loginWithToken = useCallback(
+    async (token: string, remember = true) => {
+      setAccessToken(token, remember);
+      const sessionUser = await hydrateFromSession();
+      queryClient.setQueryData(SESSION_KEY, sessionUser);
+      setHasToken(true);
+      if (!sessionUser) throw new Error("Could not load session after authentication");
+      return sessionUser;
+    },
+    [queryClient]
+  );
 
   const login = useCallback(
     async (email: string, password: string, remember = true) => {
@@ -85,13 +100,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const logout = useCallback(() => {
     clearAccessToken();
-    setUser(null);
-    setStatus("unauthenticated");
-  }, []);
+    queryClient.setQueryData(SESSION_KEY, null);
+    setHasToken(false);
+  }, [queryClient]);
 
-  const patchUser = useCallback((partial: Partial<AuthUser>) => {
-    setUser((prev) => (prev ? { ...prev, ...partial } : prev));
-  }, []);
+  const patchUser = useCallback(
+    (partial: Partial<AuthUser>) => {
+      queryClient.setQueryData<AuthUser | null>(SESSION_KEY, (prev) =>
+        prev ? { ...prev, ...partial } : prev
+      );
+    },
+    [queryClient]
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, status, login, loginWithToken, registerAccount, logout, patchUser }),
