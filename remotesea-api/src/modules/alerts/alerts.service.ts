@@ -48,6 +48,10 @@ export class AlertsService {
 
     let sent = 0;
 
+    // lastSentAt is persisted immediately after each successful send (not batched
+    // at the end of the loop) so a crash partway through a run can't leave an
+    // alert's email sent but its lastSentAt stale — which would re-match the same
+    // jobs and duplicate-send on the next cron tick.
     for (const alert of alerts) {
       const gap = FREQUENCY_GAP_MS[alert.frequency];
       if (alert.lastSentAt && now - alert.lastSentAt.getTime() < gap) continue;
@@ -76,7 +80,7 @@ export class AlertsService {
       if (jobs.length === 0) continue;
 
       await this.emailService.sendJobAlertEmail(alert.user.email, jobs);
-      await this.alertsRepository.markSent(alert.id);
+      await this.alertsRepository.markManySent([alert.id]);
       sent += 1;
     }
 
