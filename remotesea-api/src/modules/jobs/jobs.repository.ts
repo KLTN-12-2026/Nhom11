@@ -5,6 +5,7 @@ import { activeJobBaseWhere, facetSelect, type FacetRow } from "./job-search.uti
 import { jobWithRelationsInclude } from "@/common/types/job-with-relations.type";
 
 const jobDetailInclude = {
+  ...jobWithRelationsInclude,
   employer: {
     select: {
       companyName: true,
@@ -16,8 +17,6 @@ const jobDetailInclude = {
       hqCountry: true,
     },
   },
-  categories: { include: { category: true } },
-  skills: { include: { skill: true } },
 } satisfies Prisma.JobInclude;
 
 @Injectable()

@@ -1,5 +1,5 @@
 import { Injectable } from "@nestjs/common";
-import type { Application, TalentProfile } from "@prisma/client";
+import type { Application, Prisma, TalentProfile } from "@prisma/client";
 import { PrismaService } from "@/core/database/prisma.service";
 import type { ApplicationWithJob, CreateApplicationInput } from "./interfaces";
 import { jobWithRelationsInclude } from "@/common/types/job-with-relations.type";
@@ -7,6 +7,12 @@ import {
   jobWithEmployerEmailInclude,
   type JobWithEmployerEmail,
 } from "@/common/types/job-with-employer-email.type";
+
+const talentWithUserNameInclude = {
+  user: { select: { name: true } },
+} satisfies Prisma.TalentProfileInclude;
+
+type TalentWithUserName = Prisma.TalentProfileGetPayload<{ include: typeof talentWithUserNameInclude }>;
 
 @Injectable()
 export class ApplicationsRepository {
@@ -19,12 +25,10 @@ export class ApplicationsRepository {
     });
   }
 
-  findTalentWithUserName(
-    userId: string
-  ): Promise<(TalentProfile & { user: { name: string | null } }) | null> {
+  findTalentWithUserName(userId: string): Promise<TalentWithUserName | null> {
     return this.prisma.talentProfile.findUnique({
       where: { userId },
-      include: { user: { select: { name: true } } },
+      include: talentWithUserNameInclude,
     });
   }
 
@@ -33,7 +37,7 @@ export class ApplicationsRepository {
       where: { talentId },
       orderBy: { appliedAt: "desc" },
       include: { job: { include: jobWithRelationsInclude } },
-    }) as Promise<ApplicationWithJob[]>;
+    });
   }
 
   findByJobAndTalent(jobId: string, talentId: string): Promise<Application | null> {

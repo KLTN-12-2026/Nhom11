@@ -1,10 +1,18 @@
 import { Injectable } from "@nestjs/common";
+import type { Prisma } from "@prisma/client";
 import { PrismaService } from "@/core/database/prisma.service";
 
-export type CategoryWithActiveJobSalaries = {
-  name: string;
-  jobs: Array<{ job: { salaryMin: number | null; salaryMax: number | null } }>;
-};
+const categorySalarySelect = {
+  name: true,
+  jobs: {
+    where: { job: { status: "ACTIVE", salaryMin: { not: null } } },
+    select: { job: { select: { salaryMin: true, salaryMax: true } } },
+  },
+} satisfies Prisma.CategorySelect;
+
+export type CategoryWithActiveJobSalaries = Prisma.CategoryGetPayload<{
+  select: typeof categorySalarySelect;
+}>;
 
 @Injectable()
 export class SalaryRepository {
@@ -12,13 +20,7 @@ export class SalaryRepository {
 
   findCategoriesWithActiveJobSalaries(): Promise<CategoryWithActiveJobSalaries[]> {
     return this.prisma.category.findMany({
-      select: {
-        name: true,
-        jobs: {
-          where: { job: { status: "ACTIVE", salaryMin: { not: null } } },
-          select: { job: { select: { salaryMin: true, salaryMax: true } } },
-        },
-      },
+      select: categorySalarySelect,
     });
   }
 }
