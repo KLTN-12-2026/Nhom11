@@ -107,14 +107,6 @@ export type Facets = {
   category: Record<string, number>;
 };
 
-export type FacetRow = {
-  jobType: JobType;
-  level: ExperienceLevel;
-  country: string | null;
-  timezone: string | null;
-  categories: Array<{ category: { name: string } }>;
-};
-
 export const facetSelect = {
   jobType: true,
   level: true,
@@ -122,6 +114,8 @@ export const facetSelect = {
   timezone: true,
   categories: { select: { category: { select: { name: true } } } },
 } satisfies Prisma.JobSelect;
+
+export type FacetRow = Prisma.JobGetPayload<{ select: typeof facetSelect }>;
 
 function matchesTz(row: FacetRow, key: string): boolean {
   if (key === "sea") {

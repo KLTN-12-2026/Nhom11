@@ -66,7 +66,7 @@ export class AlertsRepository {
       take: 10,
       orderBy: { publishedAt: "desc" },
       include: jobWithRelationsInclude,
-    }) as Promise<JobWithRelations[]>;
+    });
   }
 
   async markManySent(ids: string[]): Promise<void> {

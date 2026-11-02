@@ -1,22 +1,33 @@
 import { Injectable } from "@nestjs/common";
-import type { EmployerProfile, Job, JobStatus, PlanType } from "@prisma/client";
+import type { EmployerProfile, Job, JobStatus, PlanType, Prisma } from "@prisma/client";
 import { PrismaService } from "@/core/database/prisma.service";
 import { jobWithEmployerEmailInclude } from "@/common/types/job-with-employer-email.type";
 
-type EmployerListItem = EmployerProfile & {
-  user: { email: string };
-  _count: { jobs: number };
-  jobs: { planType: PlanType }[];
-};
+const employerListInclude = {
+  user: { select: { email: true } },
+  _count: { select: { jobs: true } },
+  jobs: { where: { planPaid: true }, select: { planType: true } },
+} satisfies Prisma.EmployerProfileInclude;
 
-type JobListItem = Job & {
-  employer: { companyName: string; isVerified: boolean; slug: string };
-  categories: { category: unknown }[];
-};
+type EmployerListItem = Prisma.EmployerProfileGetPayload<{ include: typeof employerListInclude }>;
 
-export type PaidJobRevenueRow = Pick<Job, "id" | "title" | "planType" | "paidAt" | "createdAt"> & {
-  employer: { companyName: string };
-};
+const jobListInclude = {
+  employer: { select: { companyName: true, isVerified: true, slug: true } },
+  categories: { include: { category: true } },
+} satisfies Prisma.JobInclude;
+
+type JobListItem = Prisma.JobGetPayload<{ include: typeof jobListInclude }>;
+
+const paidJobRevenueSelect = {
+  id: true,
+  title: true,
+  planType: true,
+  paidAt: true,
+  createdAt: true,
+  employer: { select: { companyName: true } },
+} satisfies Prisma.JobSelect;
+
+export type PaidJobRevenueRow = Prisma.JobGetPayload<{ select: typeof paidJobRevenueSelect }>;
 
 @Injectable()
 export class AdminRepository {
@@ -33,11 +44,7 @@ export class AdminRepository {
         skip,
         take,
         orderBy: { createdAt: "desc" },
-        include: {
-          user: { select: { email: true } },
-          _count: { select: { jobs: true } },
-          jobs: { where: { planPaid: true }, select: { planType: true } },
-        },
+        include: employerListInclude,
       }),
       this.prisma.employerProfile.count({ where }),
     ]);
@@ -65,10 +72,7 @@ export class AdminRepository {
         skip,
         take,
         orderBy: { createdAt: "asc" },
-        include: {
-          employer: { select: { companyName: true, isVerified: true, slug: true } },
-          categories: { include: { category: true } },
-        },
+        include: jobListInclude,
       }),
       this.prisma.job.count({ where }),
     ]);
@@ -119,14 +123,7 @@ export class AdminRepository {
   findRecentPaidJobs(limit: number): Promise<PaidJobRevenueRow[]> {
     return this.prisma.job.findMany({
       where: { planPaid: true },
-      select: {
-        id: true,
-        title: true,
-        planType: true,
-        paidAt: true,
-        createdAt: true,
-        employer: { select: { companyName: true } },
-      },
+      select: paidJobRevenueSelect,
       orderBy: [{ paidAt: "desc" }, { createdAt: "desc" }],
       take: limit,
     });

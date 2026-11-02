@@ -13,7 +13,7 @@ export class SavedRepository {
       where: { userId },
       orderBy: { createdAt: "desc" },
       include: { job: { include: jobWithRelationsInclude } },
-    }) as Promise<SavedJobWithJob[]>;
+    });
   }
 
   /** Idempotent: succeeds whether or not the row existed. */
